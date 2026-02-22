@@ -57,5 +57,20 @@ export async function POST(request: Request) {
     };
   }
 
+  const workspaceId = user.user_metadata?.workspace_id;
+  let threshold = 0.85;
+  if (workspaceId) {
+    const { data: settings } = await supabase
+      .from("workspace_settings")
+      .select("confidence_threshold")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (settings?.confidence_threshold != null) {
+      threshold = settings.confidence_threshold;
+    }
+  }
+
+  result.safeToSend = result.confidenceScore >= threshold * 100;
+
   return NextResponse.json(result);
 }

@@ -12,7 +12,7 @@ export async function GET() {
   // Fetch sync status for all channels
   const { data: connections } = await supabase
     .from("channel_connections")
-    .select("id, provider, status, last_synced_at, account_label")
+    .select("id, provider, status, last_sync_at, provider_account_name")
     .eq("user_id", user.id);
 
   // Fetch Shopify sync status

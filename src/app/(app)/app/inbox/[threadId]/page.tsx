@@ -93,6 +93,7 @@ export default function ConversationPage() {
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set());
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [draftFocused, setDraftFocused] = useState(false);
+  const [sendToast, setSendToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const draftRef = useRef<HTMLDivElement>(null);
 
@@ -141,8 +142,9 @@ export default function ConversationPage() {
   const handleSend = useCallback(async () => {
     if (!draftText || isSending) return;
     setIsSending(true);
+    setSendToast(null);
     try {
-      await fetch("/api/integrations/send-message", {
+      const res = await fetch("/api/integrations/send-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -152,8 +154,16 @@ export default function ConversationPage() {
           channel: thread?.provider || "GMAIL",
         }),
       });
-      router.push("/app/inbox");
-    } catch {
+      const data = await res.json();
+      if (!res.ok) {
+        setSendToast({ type: "error", message: data.error || "Failed to send message" });
+        setIsSending(false);
+        return;
+      }
+      setSendToast({ type: "success", message: "Message sent successfully" });
+      setTimeout(() => router.push("/app/inbox"), 1200);
+    } catch (err) {
+      setSendToast({ type: "error", message: String(err) });
       setIsSending(false);
     }
   }, [draftText, isSending, threadId, draft, thread, router]);
@@ -619,6 +629,27 @@ export default function ConversationPage() {
           </div>
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {sendToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-xl backdrop-blur-sm ${
+              sendToast.type === "success"
+                ? "bg-green-500/10 border border-green-500/20 text-green-400"
+                : "bg-red-500/10 border border-red-500/20 text-red-400"
+            }`}
+            onAnimationComplete={() => {
+              if (sendToast.type === "success") return;
+              setTimeout(() => setSendToast(null), 4000);
+            }}
+          >
+            {sendToast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

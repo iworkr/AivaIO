@@ -17,8 +17,8 @@ export async function GET(req: NextRequest) {
       .from("calendar_events")
       .select("*")
       .eq("user_id", user.id)
-      .gte("start_time", start)
       .lte("start_time", end)
+      .gte("end_time", start)
       .order("start_time", { ascending: true });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

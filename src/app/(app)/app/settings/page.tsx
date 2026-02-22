@@ -141,7 +141,6 @@ export default function SettingsPage() {
   const connectionList = [
     { provider: "gmail", name: "Gmail", desc: "Email inbox & sent history" },
     { provider: "slack", name: "Slack", desc: "Channels & direct messages" },
-    { provider: "whatsapp", name: "WhatsApp", desc: "Business messaging" },
     { provider: "shopify", name: "Shopify", desc: "Orders, customers & support" },
   ].map((item) => {
     const conn = (connections || []).find((c: Record<string, unknown>) => (c.provider as string)?.toLowerCase() === item.provider);
@@ -380,13 +379,14 @@ export default function SettingsPage() {
               <motion.div variants={staggerItem} className="rounded-xl border border-[var(--aiva-blue-border)] bg-[var(--background-elevated)] p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className="text-lg font-semibold text-[var(--text-primary)]">Team Plan</p>
-                    <p className="text-sm text-[var(--text-secondary)]">$79/month</p>
+                    <p className="text-lg font-semibold text-[var(--text-primary)]">Free Plan</p>
+                    <p className="text-sm text-[var(--text-secondary)]">$0/month</p>
                   </div>
                   <Badge variant="blue">Active</Badge>
                 </div>
-                <ProgressBar value={60} />
-                <p className="text-xs text-[var(--text-tertiary)] mt-1">3,000 / 5,000 AI drafts used this month</p>
+                <ProgressBar value={0} />
+                <p className="text-xs text-[var(--text-tertiary)] mt-1">0 / 100 AI drafts used this month</p>
+                <p className="text-xs text-[var(--text-tertiary)] mt-3">Upgrade to unlock unlimited AI drafts, priority support, and advanced integrations.</p>
               </motion.div>
             </motion.div>
           )}

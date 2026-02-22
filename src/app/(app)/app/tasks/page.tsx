@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { LottieAnimation } from "@/components/ui";
@@ -117,7 +118,16 @@ function formatRelativeDate(dateStr: string | null): string {
 /* ═══════════════════ Main Component ═══════════════════ */
 
 export default function TasksPage() {
+  return (
+    <Suspense>
+      <TasksPageInner />
+    </Suspense>
+  );
+}
+
+function TasksPageInner() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -128,10 +138,12 @@ export default function TasksPage() {
   const [newTaskDue, setNewTaskDue] = useState("");
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
-  const [calendarView, setCalendarView] = useState<CalendarView>("week");
+  const initialView = (searchParams.get("view") as CalendarView) || "week";
+  const [calendarView, setCalendarView] = useState<CalendarView>(initialView);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const newTaskRef = useRef<HTMLInputElement>(null);
 
   const loadTasks = useCallback(async () => {
@@ -178,20 +190,31 @@ export default function TasksPage() {
 
   const handleCreateTask = async () => {
     if (!newTaskTitle.trim()) return;
-    await fetch("/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: newTaskTitle.trim(),
-        priority: newTaskPriority,
-        due_date: newTaskDue || null,
-      }),
-    });
-    setNewTaskTitle("");
-    setNewTaskPriority("medium");
-    setNewTaskDue("");
-    setShowNewTask(false);
-    loadTasks();
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newTaskTitle.trim(),
+          priority: newTaskPriority,
+          due_date: newTaskDue || null,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setToast({ type: "error", message: err.error || "Failed to create task" });
+        setTimeout(() => setToast(null), 4000);
+        return;
+      }
+      setNewTaskTitle("");
+      setNewTaskPriority("medium");
+      setNewTaskDue("");
+      setShowNewTask(false);
+      loadTasks();
+    } catch (err) {
+      setToast({ type: "error", message: String(err) });
+      setTimeout(() => setToast(null), 4000);
+    }
   };
 
   const handleToggleStatus = async (task: Task) => {
@@ -478,6 +501,23 @@ export default function TasksPage() {
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-xl backdrop-blur-sm ${
+              toast.type === "error"
+                ? "bg-red-500/10 border border-red-500/20 text-red-400"
+                : "bg-green-500/10 border border-green-500/20 text-green-400"
+            }`}
+          >
+            {toast.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

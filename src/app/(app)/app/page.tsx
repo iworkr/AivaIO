@@ -15,6 +15,7 @@ import type { AIResponse } from "@/types";
 import {
   ArrowUp, Paperclip, Mic, Sparkles,
   AlertCircle, Calendar, Ghost, FileText, X,
+  MessageSquare, Plus, Trash2,
 } from "lucide-react";
 
 interface ChatMessage {
@@ -265,6 +266,13 @@ function InputBar({
   );
 }
 
+interface ChatSession {
+  id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const { hasAnyConnection } = useIntegrations();
@@ -276,6 +284,9 @@ export default function DashboardPage() {
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const [showSlash, setShowSlash] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const feedEndRef = useRef<HTMLDivElement>(null);
 
@@ -301,6 +312,66 @@ export default function DashboardPage() {
       feedEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
+
+  const loadSessions = useCallback(async () => {
+    setSessionsLoading(true);
+    try {
+      const res = await fetch("/api/chat/sessions");
+      if (res.ok) {
+        const data = await res.json();
+        setSessions(data);
+      }
+    } catch { /* ignore */ }
+    setSessionsLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (user) loadSessions();
+  }, [user, loadSessions]);
+
+  const loadSession = useCallback(async (session: ChatSession) => {
+    setSessionId(session.id);
+    setChatActive(true);
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const { data: chatMsgs } = await supabase
+        .from("chat_messages")
+        .select("id, role, content, tool_calls, created_at")
+        .eq("session_id", session.id)
+        .order("created_at", { ascending: true });
+
+      if (chatMsgs) {
+        const loaded: ChatMessage[] = chatMsgs
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({
+            id: m.id,
+            role: m.role as "user" | "assistant",
+            text: m.content || "",
+          }));
+        setMessages(loaded);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const deleteSession = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/chat/sessions?id=${id}`, { method: "DELETE" });
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      if (sessionId === id) {
+        setSessionId(null);
+        setMessages([]);
+        setChatActive(false);
+      }
+    } catch { /* ignore */ }
+  }, [sessionId]);
+
+  const startNewChat = useCallback(() => {
+    setSessionId(null);
+    setMessages([]);
+    setChatActive(false);
+    inputRef.current?.focus();
+  }, []);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isThinking) return;
@@ -343,6 +414,19 @@ export default function DashboardPage() {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const errMsg = errData.error || `Request failed (${res.status})`;
+        setErrorToast(errMsg);
+        setTimeout(() => setErrorToast(null), 5000);
+        setMessages((prev) => [
+          ...prev,
+          { id: `a-${Date.now()}`, role: "assistant", text: "Something went wrong. Try again." },
+        ]);
+        setIsThinking(false);
+        return;
+      }
+
       const data: AIResponse = await res.json();
 
       if (data.sessionId && !sessionId) {
@@ -358,6 +442,8 @@ export default function DashboardPage() {
         toolsUsed: data.toolsUsed,
       };
       setMessages((prev) => [...prev, assistantMsg]);
+      if (data.sessionId) setSessionId(data.sessionId);
+      loadSessions();
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -366,7 +452,7 @@ export default function DashboardPage() {
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking, sessionId]);
+  }, [isThinking, sessionId, loadSessions]);
 
   const handleSubmit = () => {
     if (inputValue.trim()) sendMessage(inputValue);
@@ -458,6 +544,44 @@ export default function DashboardPage() {
             </motion.div>
           )}
 
+          {sessions.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full max-w-4xl mb-8"
+            >
+              <p className="text-[11px] font-semibold tracking-wider uppercase text-[var(--text-tertiary)] mb-3">
+                Recent Chats
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {sessions.slice(0, 6).map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => loadSession(s)}
+                    className="group relative text-left bg-[#0A0A0A] border border-[rgba(255,255,255,0.06)] rounded-xl px-4 py-3 hover:border-[rgba(255,255,255,0.15)] transition-all"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <MessageSquare size={12} className="text-[var(--text-tertiary)]" />
+                      <span className="text-sm text-[var(--text-primary)] truncate flex-1">
+                        {s.title || "Untitled Chat"}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-[var(--text-tertiary)]">
+                      {new Date(s.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                    </p>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }}
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 h-6 w-6 rounded flex items-center justify-center text-[var(--text-tertiary)] hover:text-red-400 transition-all"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -488,6 +612,19 @@ export default function DashboardPage() {
           transition={{ duration: 0.25, ease: "easeOut" }}
           className="flex-1 flex flex-col overflow-hidden"
         >
+          {/* Chat Header */}
+          <div className="h-12 shrink-0 flex items-center justify-between px-6 border-b border-[rgba(255,255,255,0.04)]">
+            <span className="text-xs text-[var(--text-tertiary)] font-mono">
+              {sessionId ? sessions.find((s) => s.id === sessionId)?.title || "Chat" : "New Chat"}
+            </span>
+            <button
+              onClick={startNewChat}
+              className="flex items-center gap-1.5 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <Plus size={12} />
+              New Chat
+            </button>
+          </div>
           {/* Chat Feed */}
           <div className="flex-1 overflow-y-auto">
             <div className="w-full max-w-3xl mx-auto flex flex-col px-6 pt-8 pb-40">
@@ -588,6 +725,19 @@ export default function DashboardPage() {
           />
         </motion.div>
       )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {errorToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-xl backdrop-blur-sm bg-red-500/10 border border-red-500/20 text-red-400"
+          >
+            {errorToast}
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );

@@ -1,17 +1,39 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import crypto from "crypto";
+
+async function verifyShopifyHmac(request: Request): Promise<{ valid: boolean; body: string }> {
+  const hmac = request.headers.get("x-shopify-hmac-sha256");
+  const secret = process.env.SHOPIFY_WEBHOOK_SECRET;
+
+  const rawBody = await request.text();
+
+  if (!secret || !hmac) {
+    return { valid: !secret, body: rawBody };
+  }
+
+  const computed = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody, "utf-8")
+    .digest("base64");
+
+  return { valid: crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(computed)), body: rawBody };
+}
 
 export async function POST(request: Request) {
   const topic = request.headers.get("x-shopify-topic");
   const shopDomain = request.headers.get("x-shopify-shop-domain");
-  const hmac = request.headers.get("x-shopify-hmac-sha256");
 
   if (!topic || !shopDomain) {
     return NextResponse.json({ error: "Missing Shopify headers" }, { status: 400 });
   }
 
-  // In production: verify HMAC signature here
-  const body = await request.json();
+  const { valid, body: rawBody } = await verifyShopifyHmac(request);
+  if (!valid) {
+    return NextResponse.json({ error: "Invalid HMAC signature" }, { status: 401 });
+  }
+
+  const body = JSON.parse(rawBody);
   const supabase = await createClient();
 
   switch (topic) {

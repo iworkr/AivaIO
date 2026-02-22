@@ -144,6 +144,59 @@ export function getMessageHtml(message: GmailMessage): string | null {
   return extractBody(message.payload, "text/html");
 }
 
+function encodeBase64Url(str: string): string {
+  return Buffer.from(str, "utf-8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+export interface SendGmailOptions {
+  accessToken: string;
+  to: string;
+  subject: string;
+  body: string;
+  from?: string;
+  threadId?: string;
+  inReplyTo?: string;
+  references?: string;
+}
+
+export async function sendGmailMessage(opts: SendGmailOptions): Promise<{ id: string; threadId: string }> {
+  const lines: string[] = [];
+  if (opts.from) lines.push(`From: ${opts.from}`);
+  lines.push(`To: ${opts.to}`);
+  lines.push(`Subject: ${opts.subject}`);
+  if (opts.inReplyTo) lines.push(`In-Reply-To: ${opts.inReplyTo}`);
+  if (opts.references) lines.push(`References: ${opts.references}`);
+  lines.push("Content-Type: text/plain; charset=utf-8");
+  lines.push("MIME-Version: 1.0");
+  lines.push("");
+  lines.push(opts.body);
+
+  const raw = encodeBase64Url(lines.join("\r\n"));
+
+  const payload: Record<string, string> = { raw };
+  if (opts.threadId) payload.threadId = opts.threadId;
+
+  const res = await fetch(`${GMAIL_API}/messages/send`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${opts.accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Gmail messages.send failed (${res.status}): ${text}`);
+  }
+
+  return res.json();
+}
+
 export function getMessageRecipients(
   message: GmailMessage
 ): Array<{ email: string; name: string; type: "to" | "cc" | "bcc" }> {

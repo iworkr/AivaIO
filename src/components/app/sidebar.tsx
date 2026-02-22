@@ -7,6 +7,7 @@ import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useIntegrations } from "@/hooks/use-integrations";
+import { useUnreadCount } from "@/hooks/use-unread-count";
 import { GmailIcon, SlackIcon, ShopifyIcon } from "@/components/icons/brand-icons";
 import { ConnectionModal } from "./connection-modal";
 import {
@@ -26,7 +27,7 @@ const mainLinks = [
   { icon: Star, label: "VIP / Urgent", href: "/app/inbox?filter=vip" },
   { icon: PenLine, label: "Drafts", href: "/app/inbox?filter=drafts" },
   { icon: CheckSquare, label: "Tasks", href: "/app/tasks" },
-  { icon: Calendar, label: "Calendar", href: "/app/tasks" },
+  { icon: Calendar, label: "Calendar", href: "/app/tasks?view=calendar" },
 ];
 
 const INTEGRATION_META: Record<string, { icon: React.FC<{ size?: number; className?: string }>; label: string }> = {
@@ -40,6 +41,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const router = useRouter();
   const { user } = useAuth();
   const { integrations } = useIntegrations();
+  const unreadCount = useUnreadCount();
   const [hoveredIntegration, setHoveredIntegration] = useState<string | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
 
@@ -81,10 +83,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <div className="mt-4 px-2 flex flex-col gap-0.5">
             {mainLinks.map((link) => {
               const Icon = link.icon;
-              const isActive = pathname === link.href ||
-                (link.href === "/app/inbox" && pathname?.startsWith("/app/inbox")) ||
-                (link.href === "/app/tasks" && pathname?.startsWith("/app/tasks")) ||
-                (link.href === "/app" && pathname === "/app");
+              const linkPath = link.href.split("?")[0];
+              const isActive = pathname === linkPath ||
+                (linkPath === "/app/inbox" && pathname?.startsWith("/app/inbox")) ||
+                (linkPath === "/app/tasks" && pathname?.startsWith("/app/tasks")) ||
+                (linkPath === "/app" && pathname === "/app");
               return (
                 <Link
                   key={link.label}
@@ -104,9 +107,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     )}
                   />
                   <span className="flex-1 text-sm truncate">{link.label}</span>
-                  {link.badgeKey === "inbox" && (
+                  {link.badgeKey === "inbox" && unreadCount > 0 && (
                     <span className="bg-blue-500/10 text-blue-400 text-[10px] font-mono px-1.5 rounded leading-none py-0.5">
-                      12
+                      {unreadCount > 99 ? "99+" : unreadCount}
                     </span>
                   )}
                 </Link>
