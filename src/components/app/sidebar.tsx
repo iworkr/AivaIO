@@ -11,7 +11,7 @@ import { useUnreadCount } from "@/hooks/use-unread-count";
 import { GmailIcon, SlackIcon, ShopifyIcon } from "@/components/icons/brand-icons";
 import { ConnectionModal } from "./connection-modal";
 import {
-  Command, Inbox, Star, PenLine, CheckSquare, Calendar,
+  Command, Inbox, CheckSquare, Calendar,
   Settings, Search, ChevronsUpDown,
   Menu, X, Settings2,
 } from "lucide-react";
@@ -24,8 +24,6 @@ interface SidebarProps {
 const mainLinks = [
   { icon: Command, label: "Home", href: "/app" },
   { icon: Inbox, label: "Inbox", href: "/app/inbox", badgeKey: "inbox" },
-  { icon: Star, label: "VIP / Urgent", href: "/app/inbox?filter=vip" },
-  { icon: PenLine, label: "Drafts", href: "/app/inbox?filter=drafts" },
   { icon: CheckSquare, label: "Tasks", href: "/app/tasks" },
   { icon: Calendar, label: "Calendar", href: "/app/tasks?view=calendar" },
 ];
