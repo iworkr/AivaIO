@@ -37,7 +37,7 @@ ${batch.map((e, j) => `---Email ${j + 1}---\n${e}`).join("\n\n")}`;
         temperature: 0.1,
         responseFormat: "json_object",
       });
-      const parsed = JSON.parse(res.content);
+      const parsed = JSON.parse(res.content || "{}");
       scores.push(parsed);
     } catch { /* skip bad batches */ }
   }
@@ -127,7 +127,7 @@ ${finalText}`,
   });
 
   try {
-    const deltas = JSON.parse(res.content);
+    const deltas = JSON.parse(res.content || "{}");
 
     // Fetch current profile and apply deltas
     const { data: current } = await supabase.from("voice_preferences")
