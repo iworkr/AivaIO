@@ -6,7 +6,7 @@ import { FlightWidget } from "./flight-widget";
 import { ShopifyWidget } from "./shopify-widget";
 import { CalendarWidget } from "./calendar-widget";
 import { ActionWidget } from "./action-widget";
-import { CitationPill } from "./citation-pill";
+import { EmailSummaryTile } from "./email-summary-tile";
 import type { AIResponse, WidgetData } from "@/types";
 
 function renderWidget(widget: WidgetData, index: number) {
@@ -19,6 +19,8 @@ function renderWidget(widget: WidgetData, index: number) {
       return <CalendarWidget key={index} data={widget.data} />;
     case "ACTION_CARD":
       return <ActionWidget key={index} data={widget.data} />;
+    case "EMAIL_SUMMARY_CARD":
+      return <EmailSummaryTile key={index} data={widget.data} />;
     default:
       return null;
   }
@@ -30,29 +32,14 @@ export function AIResponseRenderer({ response }: { response: AIResponse }) {
       variants={linearFadeIn}
       initial="hidden"
       animate="visible"
-      className="flex flex-col gap-4"
+      className="flex flex-col gap-3"
     >
-      {response.textSummary && (
-        <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-          {response.textSummary}
-          {response.citations.map((cite) => (
-            <CitationPill
-              key={cite.id}
-              source={cite.source}
-              label={cite.source.charAt(0).toUpperCase() + " " + cite.id.slice(0, 6)}
-              snippet={cite.snippet}
-              messageId={cite.id}
-            />
-          ))}
-        </p>
-      )}
-
       {response.widgets.map((widget, i) => (
         <motion.div
           key={i}
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: i * 0.15, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.1, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         >
           {renderWidget(widget, i)}
         </motion.div>

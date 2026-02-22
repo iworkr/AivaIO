@@ -5,4 +5,5 @@ export { ShopifyWidget } from "./shopify-widget";
 export { CalendarWidget } from "./calendar-widget";
 export { ActionWidget } from "./action-widget";
 export { AccommodationWidget } from "./accommodation-widget";
+export { EmailSummaryTile } from "./email-summary-tile";
 export { AIResponseRenderer } from "./ai-response-renderer";

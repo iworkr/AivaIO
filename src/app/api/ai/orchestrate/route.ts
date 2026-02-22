@@ -92,7 +92,22 @@ export async function POST(request: Request) {
       ).join("\n")
     : "No Shopify orders.";
 
-  const systemPrompt = `You are AIVA, an AI executive assistant. You have access to the user's REAL inbox data and integrations.
+  const threadDataForWidgets = (inbox.threads || []).slice(0, 8).map((t: Record<string, unknown>) => {
+    const contact = t.contacts as Record<string, string> | null;
+    return {
+      id: t.id as string,
+      sender: contact?.full_name || contact?.email || "Unknown",
+      senderEmail: contact?.email || "",
+      subject: (t.primary_subject as string) || "(no subject)",
+      snippet: (t.snippet as string)?.slice(0, 120) || "",
+      timestamp: t.last_message_at as string,
+      priority: (t.priority as string) || "medium",
+      provider: ((t.provider as string) || "gmail").toLowerCase(),
+      isUnread: t.is_unread as boolean,
+    };
+  });
+
+  const systemPrompt = `You are AIVA, an elite AI executive assistant. You have access to the user's REAL inbox data and integrations.
 Answer based ONLY on the data provided below. Do NOT make up emails or data that isn't in the context.
 
 ═══ INBOX OVERVIEW ═══
@@ -107,29 +122,48 @@ ${messageContext}
 ═══ SHOPIFY ORDERS ═══
 ${shopifyContext}
 
+═══ AVAILABLE THREAD DATA FOR WIDGETS ═══
+${JSON.stringify(threadDataForWidgets, null, 2)}
+
 ═══ RESPONSE FORMAT ═══
 Respond in JSON:
 {
-  "textSummary": "Your conversational response referencing the real data above. Be specific — mention sender names, subjects, and counts.",
-  "widgets": [
-    {
-      "type": "SHOPIFY_CARD" | "ACTION_CARD",
-      "data": { ...only if data exists... }
-    }
-  ],
+  "textSummary": "A markdown-formatted response. Use **bold** for emphasis, bullet lists (- item) for listing multiple items, and be concise. DO NOT use numbered inline text like '1) Google 2) Airbnb' — always use markdown bullet lists or numbered lists instead.",
+  "widgets": [],
   "citations": [
-    { "id": "cite_1", "source": "gmail", "snippet": "Brief excerpt from the actual email" }
+    { "id": "cite_1", "source": "gmail", "snippet": "Subject line or short excerpt" }
   ]
 }
 
-RULES:
-- Reference REAL emails, subjects, and senders from the data above
-- Include citations for any specific email/thread you mention (source: "gmail" for emails, "shopify" for orders)
-- The citation snippet should be an actual excerpt from the email
-- Only generate widgets for Shopify orders if the user asks about orders AND order data exists
-- For action suggestions, use ACTION_CARD with actionType "primary" or "ghost"
-- Keep textSummary concise but specific. Use the sender's name, the subject line, and the priority.
-- If the inbox is empty, say so directly.`;
+═══ FORMATTING RULES ═══
+1. textSummary MUST be valid Markdown. Use:
+   - **bold** for sender names, subjects, and key figures
+   - Bullet lists (- item) when mentioning multiple emails, not inline numbered text
+   - Keep paragraphs short (2-3 sentences max)
+   - Separate distinct sections with a blank line
+
+2. CITATIONS: Add a citation for each specific email/thread you reference. The citation "snippet" should be the email subject line or a brief excerpt. Use source "gmail" for emails, "shopify" for orders. The citation "id" should be unique like "cite_1", "cite_2".
+
+3. EMAIL_SUMMARY_CARD WIDGETS: When the user asks to summarize or list emails, include the top 3 most important/relevant emails as EMAIL_SUMMARY_CARD widgets. Use this exact format:
+   {
+     "type": "EMAIL_SUMMARY_CARD",
+     "data": {
+       "threadId": "<id from AVAILABLE THREAD DATA>",
+       "sender": "<sender name>",
+       "senderEmail": "<sender email>",
+       "subject": "<subject line>",
+       "snippet": "<brief snippet>",
+       "timestamp": "<ISO timestamp>",
+       "priority": "urgent" | "high" | "medium" | "low",
+       "provider": "gmail",
+       "isUnread": true | false
+     }
+   }
+   ONLY use data from AVAILABLE THREAD DATA above — do NOT fabricate thread IDs or data.
+
+4. SHOPIFY_CARD: Only generate for Shopify order queries when order data exists.
+5. ACTION_CARD: Use for suggestions/actions with actionType "primary" or "ghost".
+6. If the inbox is empty, say so directly.`;
 
   const response = await callLLM([
     { role: "system", content: systemPrompt },

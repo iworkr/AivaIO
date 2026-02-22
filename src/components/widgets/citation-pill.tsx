@@ -26,25 +26,24 @@ export function CitationPill({ source, label, snippet }: CitationPillProps) {
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button
-          className="inline-flex items-center gap-1 mx-0.5 px-1.5 py-0.5 rounded-full cursor-pointer
-            bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)]
-            text-[10px] text-[var(--text-tertiary)]
-            hover:border-[rgba(255,255,255,0.4)] transition-colors duration-150"
-          style={{ height: 18 }}
+          className="inline-flex items-center gap-1.5 ml-1 px-2 py-0.5 rounded-full cursor-pointer align-middle
+            bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.04)]
+            text-[11px] text-[var(--text-secondary)] font-mono
+            hover:bg-[rgba(255,255,255,0.1)] transition-colors duration-150"
         >
-          <Icon size={10} />
+          <Icon size={12} className="opacity-50" />
           <span>{label}</span>
         </button>
       </Popover.Trigger>
 
       <Popover.Portal>
         <Popover.Content
-          className="w-80 rounded-lg border border-[var(--border-subtle)] bg-[var(--background-main)] p-3 shadow-xl z-50"
-          sideOffset={5}
+          className="w-80 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0A0A0A] p-4 shadow-2xl z-50"
+          sideOffset={6}
           align="start"
         >
-          <div className="flex items-center gap-2 mb-2">
-            <Icon size={12} className="text-[var(--text-tertiary)]" />
+          <div className="flex items-center gap-2 mb-2.5">
+            <Icon size={13} className="text-[var(--text-tertiary)]" />
             <span className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase tracking-wider">
               {source}
             </span>
@@ -52,10 +51,10 @@ export function CitationPill({ source, label, snippet }: CitationPillProps) {
           <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
             {snippet}
           </p>
-          <button className="mt-2 text-[10px] text-[var(--aiva-blue)] hover:underline">
-            Open full message
+          <button className="mt-3 text-[11px] text-[var(--aiva-blue)] hover:underline font-medium">
+            Open full message →
           </button>
-          <Popover.Arrow className="fill-[var(--border-subtle)]" />
+          <Popover.Arrow className="fill-[#0A0A0A]" />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

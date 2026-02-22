@@ -46,11 +46,27 @@ export interface ActionWidgetData {
   };
 }
 
+export interface EmailSummaryWidgetData {
+  type: "EMAIL_SUMMARY_CARD";
+  data: {
+    threadId: string;
+    sender: string;
+    senderEmail: string;
+    subject: string;
+    snippet: string;
+    timestamp: string;
+    priority: "urgent" | "high" | "medium" | "low";
+    provider: "gmail" | "slack" | "shopify";
+    isUnread: boolean;
+  };
+}
+
 export type WidgetData =
   | FlightWidgetData
   | ShopifyWidgetData
   | CalendarWidgetData
-  | ActionWidgetData;
+  | ActionWidgetData
+  | EmailSummaryWidgetData;
 
 export interface AIResponse {
   textSummary: string;
