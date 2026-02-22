@@ -1,38 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Badge, DataRow, EmptyState } from "@/components/ui";
+import { Badge, DataRow, EmptyState, LoadingBar } from "@/components/ui";
 import { staggerContainer, staggerItem } from "@/lib/animations";
+import { fetchThreads, subscribeToMessages } from "@/lib/supabase/queries";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Mail, Hash, Phone, ShoppingBag, Sparkles, Archive,
-  FileText, CheckCircle, Filter,
+  FileText, CheckCircle,
 } from "lucide-react";
-import type { Priority, MessageProvider } from "@/types";
-
-interface MockMessage {
-  id: string;
-  provider: MessageProvider;
-  sender: string;
-  subject: string;
-  priority: Priority;
-  time: string;
-  hasDraft: boolean;
-  unread: boolean;
-}
-
-const mockMessages: MockMessage[] = [
-  { id: "1", provider: "GMAIL", sender: "Sarah Chen", subject: "Q4 Revenue Report — need your sign-off by EOD", priority: "URGENT", time: "2m", hasDraft: true, unread: true },
-  { id: "2", provider: "SLACK", sender: "James Wright", subject: "#eng — Updated the deployment docs, FYI", priority: "FYI", time: "1h", hasDraft: false, unread: true },
-  { id: "3", provider: "SHOPIFY", sender: "Emily Torres", subject: "Where is my order? Order #1042 — Blue Widgets x2", priority: "HIGH", time: "3h", hasDraft: true, unread: true },
-  { id: "4", provider: "GMAIL", sender: "Michael Park", subject: "Re: Meeting tomorrow at 3pm confirmed", priority: "NORMAL", time: "4h", hasDraft: false, unread: false },
-  { id: "5", provider: "GMAIL", sender: "Lisa Johnson", subject: "Re: Partnership proposal Q1 2026 — next steps", priority: "HIGH", time: "5h", hasDraft: true, unread: false },
-  { id: "6", provider: "SLACK", sender: "David Kim", subject: "#product — New feature deployed to staging env", priority: "FYI", time: "6h", hasDraft: false, unread: false },
-  { id: "7", provider: "GMAIL", sender: "Anna Schmidt", subject: "Invoice #4892 — payment pending review", priority: "HIGH", time: "8h", hasDraft: false, unread: false },
-  { id: "8", provider: "WHATSAPP", sender: "Carlos Martinez", subject: "Hey, are we still on for lunch Friday?", priority: "LOW", time: "12h", hasDraft: true, unread: false },
-  { id: "9", provider: "GMAIL", sender: "Rachel Kim", subject: "Quarterly board meeting — agenda attached", priority: "NORMAL", time: "1d", hasDraft: false, unread: false },
-  { id: "10", provider: "SHOPIFY", sender: "Tom Wilson", subject: "Return request for Order #1038", priority: "HIGH", time: "1d", hasDraft: true, unread: false },
-];
+import type { Priority, MessageProvider, Thread } from "@/types";
 
 const providerIcons: Record<MessageProvider, React.ReactNode> = {
   GMAIL: <Mail size={14} />,
@@ -51,18 +30,87 @@ const priorityBadge: Record<Priority, { variant: "urgent" | "high" | "fyi" | "de
 
 const filters = ["All", "Needs Review", "Urgent"] as const;
 
+function formatTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
+}
+
 export default function InboxPage() {
   const [activeFilter, setActiveFilter] = useState<string>("All");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const { user } = useAuth();
+  const router = useRouter();
 
-  const filteredMessages = mockMessages.filter((msg) => {
-    if (activeFilter === "Needs Review") return msg.hasDraft;
-    if (activeFilter === "Urgent") return msg.priority === "URGENT" || msg.priority === "HIGH";
-    return true;
-  });
+  const loadThreads = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await fetchThreads(activeFilter === "All" ? undefined : activeFilter);
+      setThreads(data);
+    } catch {
+      setThreads([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeFilter]);
+
+  useEffect(() => {
+    loadThreads();
+  }, [loadThreads]);
+
+  useEffect(() => {
+    if (!user) return;
+    const workspaceId = (user.user_metadata as Record<string, string>)?.workspace_id;
+    if (!workspaceId) return;
+
+    const channel = subscribeToMessages(workspaceId, () => {
+      loadThreads();
+    });
+
+    return () => { channel.unsubscribe(); };
+  }, [user, loadThreads]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.min(i + 1, threads.length - 1));
+      } else if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex((i) => Math.max(i - 1, 0));
+      } else if (e.key === "Enter" && threads[selectedIndex]) {
+        router.push(`/app/inbox/${threads[selectedIndex].id}`);
+      } else if (e.key === "e" && threads[selectedIndex]) {
+        setThreads((prev) => prev.filter((_, i) => i !== selectedIndex));
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [threads, selectedIndex, router]);
+
+  useEffect(() => {
+    if (threads[selectedIndex]) {
+      setSelectedId(threads[selectedIndex].id);
+    }
+  }, [selectedIndex, threads]);
 
   return (
     <div className="h-screen flex flex-col">
+      {isLoading && <LoadingBar />}
+
       {/* Top bar */}
       <div className="h-12 border-b border-[var(--border-subtle)] px-4 flex items-center gap-3 shrink-0">
         <div className="flex gap-1.5">
@@ -82,69 +130,76 @@ export default function InboxPage() {
         </div>
         <div className="flex-1" />
         <span className="text-xs text-[var(--text-tertiary)]">
-          {filteredMessages.length} messages
+          {threads.length} messages
         </span>
       </div>
 
       {/* Message list */}
-      <motion.div
-        variants={staggerContainer}
-        initial="hidden"
-        animate="visible"
-        className="flex-1 overflow-y-auto"
-      >
-        {filteredMessages.length === 0 ? (
+      <div className={`flex-1 overflow-y-auto transition-opacity duration-300 ${isLoading ? "opacity-50" : ""}`}>
+        {!isLoading && threads.length === 0 ? (
           <EmptyState
             icon={<CheckCircle size={32} />}
             title="Inbox Zero. All channels clear."
           />
         ) : (
-          filteredMessages.map((msg) => {
-            const badge = priorityBadge[msg.priority];
-            return (
-              <motion.div key={msg.id} variants={staggerItem}>
-                <DataRow
-                  active={selectedId === msg.id}
-                  onClick={() => setSelectedId(msg.id)}
-                  className="group"
-                >
-                  <span className="text-[var(--text-tertiary)] shrink-0 opacity-50 group-hover:opacity-100 transition-opacity">
-                    {providerIcons[msg.provider]}
-                  </span>
-                  {badge && (
-                    <Badge variant={badge.variant} size="sm" className="shrink-0">
-                      {badge.label}
-                    </Badge>
-                  )}
-                  <span className={`text-sm font-medium truncate w-28 shrink-0 ${
-                    msg.unread ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
-                  }`}>
-                    {msg.sender}
-                  </span>
-                  <span className="text-sm text-[var(--text-secondary)] truncate flex-1">
-                    {msg.subject}
-                  </span>
-                  {msg.hasDraft && (
-                    <Sparkles size={14} className="text-[var(--aiva-blue)] shrink-0" />
-                  )}
-                  <span className="text-[10px] font-mono text-[var(--text-tertiary)] shrink-0 w-8 text-right">
-                    {msg.time}
-                  </span>
-                  {/* Quick actions on hover */}
-                  <div className="hidden group-hover:flex items-center gap-1 shrink-0">
-                    <button className="h-6 w-6 rounded flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]">
-                      <Archive size={12} />
-                    </button>
-                    <button className="h-6 w-6 rounded flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]">
-                      <FileText size={12} />
-                    </button>
-                  </div>
-                </DataRow>
-              </motion.div>
-            );
-          })
+          <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+            {threads.map((thread, index) => {
+              const badge = priorityBadge[thread.priority];
+              const sender = thread.participants[0]?.name || "Unknown";
+              return (
+                <motion.div key={thread.id} variants={staggerItem}>
+                  <DataRow
+                    active={selectedId === thread.id}
+                    onClick={() => {
+                      setSelectedId(thread.id);
+                      setSelectedIndex(index);
+                      router.push(`/app/inbox/${thread.id}`);
+                    }}
+                    className="group"
+                  >
+                    <span className="text-[var(--text-tertiary)] shrink-0 opacity-50 group-hover:opacity-100 transition-opacity">
+                      {providerIcons[thread.provider] || <Mail size={14} />}
+                    </span>
+                    {badge && (
+                      <Badge variant={badge.variant} size="sm" className="shrink-0">
+                        {badge.label}
+                      </Badge>
+                    )}
+                    <span className={`text-sm font-medium truncate w-28 shrink-0 ${
+                      thread.unread ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
+                    }`}>
+                      {sender}
+                    </span>
+                    <span className="text-sm text-[var(--text-secondary)] truncate flex-1">
+                      {thread.subject || thread.snippet}
+                    </span>
+                    {thread.hasDraft && (
+                      <Sparkles size={14} className="text-[var(--aiva-blue)] shrink-0" />
+                    )}
+                    <span className="text-[10px] font-mono text-[var(--text-tertiary)] shrink-0 w-8 text-right">
+                      {thread.lastMessageAt ? formatTime(thread.lastMessageAt) : ""}
+                    </span>
+                    <div className="hidden group-hover:flex items-center gap-1 shrink-0">
+                      <button
+                        className="h-6 w-6 rounded flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+                        onClick={(e) => { e.stopPropagation(); }}
+                      >
+                        <Archive size={12} />
+                      </button>
+                      <button
+                        className="h-6 w-6 rounded flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+                        onClick={(e) => { e.stopPropagation(); }}
+                      >
+                        <FileText size={12} />
+                      </button>
+                    </div>
+                  </DataRow>
+                </motion.div>
+              );
+            })}
+          </motion.div>
         )}
-      </motion.div>
+      </div>
     </div>
   );
 }

@@ -1,13 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Button, Input, Slider, ToggleSwitch, Badge, Avatar, Card, CardContent, ProgressBar } from "@/components/ui";
-import { staggerContainer, staggerItem, viewportOnce } from "@/lib/animations";
+import { Button, Input, Slider, ToggleSwitch, Badge, Avatar, ProgressBar } from "@/components/ui";
+import { staggerContainer, staggerItem } from "@/lib/animations";
+import { useAuth } from "@/hooks/use-auth";
+import { useSupabaseQuery } from "@/hooks/use-supabase-query";
+import {
+  fetchVoicePreferences, updateVoicePreferences,
+  fetchWorkspaceSettings, updateWorkspaceSettings,
+  fetchChannelConnections, fetchUserProfile, updateUserProfile,
+} from "@/lib/supabase/queries";
 import {
   User, Link2, Sliders, Shield, CreditCard, Lock,
   Mail, Hash, Phone, ShoppingBag, RefreshCw,
-  ShieldAlert, Clock, FileText, DollarSign, Zap, AlertTriangle,
+  ShieldAlert, Clock, DollarSign, Zap, AlertTriangle, FileText,
 } from "lucide-react";
 
 const settingsSections = [
@@ -19,18 +26,116 @@ const settingsSections = [
   { id: "security", icon: Lock, label: "Security" },
 ];
 
+const integrationIcons: Record<string, React.ElementType> = {
+  gmail: Mail, slack: Hash, whatsapp: Phone, shopify: ShoppingBag,
+};
+
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState("profile");
+  const { user } = useAuth();
+  const userId = user?.id || "";
+  const workspaceId = (user?.user_metadata as Record<string, string>)?.workspace_id || "";
+
+  const { data: profile, refetch: refetchProfile } = useSupabaseQuery(
+    () => userId ? fetchUserProfile(userId) : Promise.resolve(null), [userId]
+  );
+  const { data: voicePrefs, refetch: refetchVoice } = useSupabaseQuery(
+    () => userId ? fetchVoicePreferences(userId) : Promise.resolve(null), [userId]
+  );
+  const { data: wsSettings, refetch: refetchWs } = useSupabaseQuery(
+    () => workspaceId ? fetchWorkspaceSettings(workspaceId) : Promise.resolve(null), [workspaceId]
+  );
+  const { data: connections } = useSupabaseQuery(
+    () => userId ? fetchChannelConnections(userId) : Promise.resolve([]), [userId]
+  );
+
+  const [name, setName] = useState("");
   const [confidenceThreshold, setConfidenceThreshold] = useState([85]);
   const [autoSendEnabled, setAutoSendEnabled] = useState(true);
   const [vipApproval, setVipApproval] = useState(true);
   const [blockPricing, setBlockPricing] = useState(true);
   const [timeWindow, setTimeWindow] = useState(true);
   const [afterHours, setAfterHours] = useState(false);
+  const [isRecalibrating, setIsRecalibrating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (profile?.display_name) setName(profile.display_name);
+    else if (user?.user_metadata?.full_name) setName(user.user_metadata.full_name as string);
+  }, [profile, user]);
+
+  useEffect(() => {
+    if (wsSettings) {
+      if (wsSettings.confidence_threshold) setConfidenceThreshold([wsSettings.confidence_threshold * 100]);
+      if (wsSettings.auto_send_enabled !== undefined) setAutoSendEnabled(wsSettings.auto_send_enabled);
+      if (wsSettings.vip_approval !== undefined) setVipApproval(wsSettings.vip_approval);
+      if (wsSettings.block_pricing !== undefined) setBlockPricing(wsSettings.block_pricing);
+      if (wsSettings.time_window !== undefined) setTimeWindow(wsSettings.time_window);
+      if (wsSettings.after_hours !== undefined) setAfterHours(wsSettings.after_hours);
+    }
+  }, [wsSettings]);
+
+  const toneDimensions = voicePrefs?.tone_profile?.dimensions || {
+    formality: 6.5, length: 3.0, warmth: 7.0, certainty: 8.5,
+  };
+
+  const handleSaveProfile = async () => {
+    if (!userId) return;
+    setIsSaving(true);
+    await updateUserProfile(userId, { display_name: name });
+    setIsSaving(false);
+    refetchProfile();
+  };
+
+  const handleSaveVault = async () => {
+    if (!workspaceId) return;
+    setIsSaving(true);
+    await updateWorkspaceSettings(workspaceId, {
+      confidence_threshold: confidenceThreshold[0] / 100,
+      auto_send_enabled: autoSendEnabled,
+      vip_approval: vipApproval,
+      block_pricing: blockPricing,
+      time_window: timeWindow,
+      after_hours: afterHours,
+    });
+    setIsSaving(false);
+    refetchWs();
+  };
+
+  const handleRecalibrate = async () => {
+    setIsRecalibrating(true);
+    try {
+      await fetch("/api/ai/draft-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId: "recalibrate", messageContext: "recalibrate", channel: "EMAIL" }),
+      });
+    } catch { /* best effort */ }
+    setTimeout(() => {
+      setIsRecalibrating(false);
+      refetchVoice();
+    }, 3000);
+  };
+
+  const connectionList = [
+    { provider: "gmail", name: "Gmail", desc: "Email inbox & sent history" },
+    { provider: "slack", name: "Slack", desc: "Channels & direct messages" },
+    { provider: "whatsapp", name: "WhatsApp", desc: "Business messaging" },
+    { provider: "shopify", name: "Shopify", desc: "Orders, customers & support" },
+  ].map((item) => {
+    const conn = (connections || []).find((c) => c.provider?.toLowerCase() === item.provider);
+    return {
+      ...item,
+      status: conn?.status || "disconnected",
+      detail: conn?.status === "active"
+        ? `Connected. Last synced ${conn?.last_synced_at ? new Date(conn.last_synced_at).toLocaleString() : "recently"}.`
+        : conn?.status === "syncing" ? "Syncing historical data..."
+        : "Not connected.",
+    };
+  });
 
   return (
     <div className="h-screen flex overflow-hidden">
-      {/* Settings nav */}
       <div className="w-52 shrink-0 border-r border-[var(--border-subtle)] py-4 px-2 overflow-y-auto">
         <p className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)] px-3 mb-2">
           Settings
@@ -47,130 +152,106 @@ export default function SettingsPage() {
                   : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
               }`}
             >
-              <Icon size={14} />
-              {section.label}
+              <Icon size={14} /> {section.label}
             </button>
           );
         })}
       </div>
 
-      {/* Content pane */}
       <div className="flex-1 overflow-y-auto py-8">
         <div className="max-w-xl mx-auto px-6">
-          {/* Profile */}
           {activeSection === "profile" && (
             <motion.div variants={staggerContainer} initial="hidden" animate="visible">
-              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">
-                Profile
-              </motion.h2>
+              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">Profile</motion.h2>
               <motion.div variants={staggerItem} className="space-y-4">
                 <div className="flex items-center gap-4 mb-6">
-                  <Avatar initials="JD" size="lg" />
+                  <Avatar initials={name?.split(" ").map((n) => n[0]).join("").slice(0, 2) || "?"} size="lg" />
                   <Button variant="secondary" size="sm">Change avatar</Button>
                 </div>
                 <div>
                   <label className="text-xs text-[var(--text-secondary)] mb-1.5 block">Full Name</label>
-                  <Input defaultValue="John Doe" />
+                  <Input value={name} onChange={(e) => setName(e.target.value)} />
                 </div>
                 <div>
                   <label className="text-xs text-[var(--text-secondary)] mb-1.5 block">Email</label>
-                  <Input defaultValue="john@acme.com" disabled />
+                  <Input value={user?.email || ""} disabled />
                 </div>
-                <Button variant="primary" size="md">Save Changes</Button>
+                <Button variant="primary" size="md" onClick={handleSaveProfile} disabled={isSaving}>
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </Button>
               </motion.div>
             </motion.div>
           )}
 
-          {/* Integrations */}
           {activeSection === "integrations" && (
             <motion.div variants={staggerContainer} initial="hidden" animate="visible">
-              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">
-                Integrations
-              </motion.h2>
+              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">Integrations</motion.h2>
               <motion.div variants={staggerItem} className="space-y-3">
-                {[
-                  { icon: Mail, name: "Gmail", status: "active", detail: "Connected. Last synced 2m ago." },
-                  { icon: Hash, name: "Slack", status: "active", detail: "Connected. 12 channels monitored." },
-                  { icon: Phone, name: "WhatsApp", status: "disconnected", detail: "Not connected." },
-                  { icon: ShoppingBag, name: "Shopify", status: "active", detail: "Connected. 340 orders synced." },
-                ].map(({ icon: Icon, name, status, detail }) => (
-                  <div key={name} className="flex items-center gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--background-elevated)] p-4">
-                    <div className="h-10 w-10 rounded-lg bg-[var(--surface-hover)] flex items-center justify-center shrink-0">
-                      <Icon size={18} className="text-[var(--text-secondary)]" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-[var(--text-primary)]">{name}</p>
-                        <div className={`w-1.5 h-1.5 rounded-full ${
-                          status === "active" ? "bg-[var(--status-success)]" :
-                          status === "syncing" ? "bg-[var(--status-warning)]" :
-                          "bg-[var(--text-tertiary)]"
-                        }`} />
+                {connectionList.map(({ provider, name: provName, desc, status, detail }) => {
+                  const Icon = integrationIcons[provider] || Mail;
+                  return (
+                    <div key={provider} className="flex items-center gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--background-elevated)] p-4">
+                      <div className="h-10 w-10 rounded-lg bg-[var(--surface-hover)] flex items-center justify-center shrink-0">
+                        <Icon size={18} className="text-[var(--text-secondary)]" />
                       </div>
-                      <p className="text-xs text-[var(--text-tertiary)]">{detail}</p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-[var(--text-primary)]">{provName}</p>
+                          <div className={`w-1.5 h-1.5 rounded-full ${
+                            status === "active" ? "bg-[var(--status-success)]" :
+                            status === "syncing" ? "bg-[var(--status-warning)]" :
+                            "bg-[var(--text-tertiary)]"
+                          }`} />
+                        </div>
+                        <p className="text-xs text-[var(--text-tertiary)]">{detail}</p>
+                      </div>
+                      <Button variant={status === "disconnected" ? "blue" : "ghost"} size="sm">
+                        {status === "disconnected" ? "Connect" : "Configure"}
+                      </Button>
                     </div>
-                    <Button variant={status === "disconnected" ? "blue" : "ghost"} size="sm">
-                      {status === "disconnected" ? "Connect" : "Configure"}
-                    </Button>
-                  </div>
-                ))}
+                  );
+                })}
               </motion.div>
             </motion.div>
           )}
 
-          {/* Tone Calibration */}
           {activeSection === "tone" && (
             <motion.div variants={staggerContainer} initial="hidden" animate="visible">
-              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">
-                Tone Calibration
-              </motion.h2>
-
-              {/* Radar chart placeholder */}
+              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">Tone Calibration</motion.h2>
               <motion.div variants={staggerItem} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background-elevated)] p-8 mb-8">
                 <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">DNA Visualizer</h3>
                 <div className="flex items-center justify-center">
                   <svg viewBox="0 0 200 200" className="w-48 h-48">
-                    {/* Axis lines */}
                     {[0, 1, 2, 3].map((i) => {
                       const angle = (i * Math.PI * 2) / 4 - Math.PI / 2;
-                      const x2 = 100 + Math.cos(angle) * 80;
-                      const y2 = 100 + Math.sin(angle) * 80;
-                      return <line key={i} x1="100" y1="100" x2={x2} y2={y2} stroke="var(--text-tertiary)" strokeWidth="0.5" opacity="0.3" />;
+                      return <line key={i} x1="100" y1="100" x2={100 + Math.cos(angle) * 80} y2={100 + Math.sin(angle) * 80} stroke="var(--text-tertiary)" strokeWidth="0.5" opacity="0.3" />;
                     })}
-                    {/* Grid rings */}
                     {[20, 40, 60, 80].map((r) => (
                       <circle key={r} cx="100" cy="100" r={r} fill="none" stroke="var(--text-tertiary)" strokeWidth="0.5" opacity="0.15" />
                     ))}
-                    {/* Data polygon */}
                     <polygon
-                      points={(() => {
-                        const dims = [6.5, 3.0, 7.0, 8.5];
-                        return dims.map((d, i) => {
+                      points={[toneDimensions.formality, toneDimensions.length, toneDimensions.warmth, toneDimensions.certainty]
+                        .map((d, i) => {
                           const angle = (i * Math.PI * 2) / 4 - Math.PI / 2;
                           const r = (d / 10) * 80;
                           return `${100 + Math.cos(angle) * r},${100 + Math.sin(angle) * r}`;
-                        }).join(" ");
-                      })()}
-                      fill="rgba(59, 130, 246, 0.1)"
-                      stroke="var(--aiva-blue)"
-                      strokeWidth="1.5"
+                        }).join(" ")}
+                      fill="rgba(59, 130, 246, 0.1)" stroke="var(--aiva-blue)" strokeWidth="1.5"
                     />
-                    {/* Labels */}
-                    <text x="100" y="10" textAnchor="middle" fill="var(--text-secondary)" fontSize="9">Formality (6.5)</text>
-                    <text x="190" y="105" textAnchor="start" fill="var(--text-secondary)" fontSize="9">Length (3.0)</text>
-                    <text x="100" y="195" textAnchor="middle" fill="var(--text-secondary)" fontSize="9">Warmth (7.0)</text>
-                    <text x="10" y="105" textAnchor="end" fill="var(--text-secondary)" fontSize="9">Certainty (8.5)</text>
+                    <text x="100" y="10" textAnchor="middle" fill="var(--text-secondary)" fontSize="9">Formality ({toneDimensions.formality})</text>
+                    <text x="190" y="105" textAnchor="start" fill="var(--text-secondary)" fontSize="9">Length ({toneDimensions.length})</text>
+                    <text x="100" y="195" textAnchor="middle" fill="var(--text-secondary)" fontSize="9">Warmth ({toneDimensions.warmth})</text>
+                    <text x="10" y="105" textAnchor="end" fill="var(--text-secondary)" fontSize="9">Certainty ({toneDimensions.certainty})</text>
                   </svg>
                 </div>
               </motion.div>
 
-              {/* Manual sliders */}
               <motion.div variants={staggerItem} className="space-y-6">
                 {[
-                  { label: "Formality", value: 65, desc: "Casual ↔ Formal" },
-                  { label: "Length", value: 30, desc: "Concise ↔ Detailed" },
-                  { label: "Warmth", value: 70, desc: "Reserved ↔ Friendly" },
-                  { label: "Certainty", value: 85, desc: "Tentative ↔ Assertive" },
+                  { label: "Formality", value: toneDimensions.formality * 10, desc: "Casual <-> Formal" },
+                  { label: "Length", value: toneDimensions.length * 10, desc: "Concise <-> Detailed" },
+                  { label: "Warmth", value: toneDimensions.warmth * 10, desc: "Reserved <-> Friendly" },
+                  { label: "Certainty", value: toneDimensions.certainty * 10, desc: "Tentative <-> Assertive" },
                 ].map((dim) => (
                   <div key={dim.label}>
                     <div className="flex justify-between mb-2">
@@ -183,30 +264,24 @@ export default function SettingsPage() {
                     <Slider defaultValue={[dim.value]} min={10} max={100} step={5} />
                   </div>
                 ))}
-                <Button variant="secondary">
-                  <RefreshCw size={14} />
-                  Recalibrate from Sent Mail
+                <Button variant="secondary" onClick={handleRecalibrate} disabled={isRecalibrating}>
+                  <RefreshCw size={14} className={isRecalibrating ? "animate-spin" : ""} />
+                  {isRecalibrating ? "Recalibrating..." : "Recalibrate from Sent Mail"}
                 </Button>
+                {isRecalibrating && <ProgressBar value={65} />}
               </motion.div>
             </motion.div>
           )}
 
-          {/* Safety Vault */}
           {activeSection === "vault" && (
             <motion.div variants={staggerContainer} initial="hidden" animate="visible">
-              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">
-                Safety Vault
-              </motion.h2>
-
-              {/* Kill switch */}
+              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">Safety Vault</motion.h2>
               <motion.div variants={staggerItem}>
                 <Button variant="destructive" className="w-full mb-8">
-                  <AlertTriangle size={14} />
-                  Halt All Automation (Draft-Only Mode)
+                  <AlertTriangle size={14} /> Halt All Automation (Draft-Only Mode)
                 </Button>
               </motion.div>
 
-              {/* Confidence slider */}
               <motion.div variants={staggerItem} className="mb-8">
                 <div className="flex justify-between mb-1">
                   <p className="text-sm font-medium text-[var(--text-primary)]">Auto-Send Confidence Threshold</p>
@@ -214,14 +289,11 @@ export default function SettingsPage() {
                     {(confidenceThreshold[0] / 100).toFixed(2)}
                   </span>
                 </div>
-                <p className="text-xs text-[var(--text-tertiary)] mb-3">
-                  AIVA will only dispatch messages that score above this threshold.
-                </p>
+                <p className="text-xs text-[var(--text-tertiary)] mb-3">AIVA will only dispatch messages that score above this threshold.</p>
                 <Slider value={confidenceThreshold} onValueChange={setConfidenceThreshold} min={70} max={95} step={1} />
               </motion.div>
 
-              {/* Rule toggles */}
-              <motion.div variants={staggerItem} className="space-y-0">
+              <motion.div variants={staggerItem} className="space-y-0 mb-6">
                 {[
                   { icon: Zap, label: "Auto-Send Enabled", desc: "Allow AIVA to dispatch approved drafts", state: autoSendEnabled, set: setAutoSendEnabled },
                   { icon: ShieldAlert, label: "Require VIP Approval", desc: "Never auto-send to VIP contacts", state: vipApproval, set: setVipApproval },
@@ -239,20 +311,20 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </motion.div>
+              <Button variant="primary" onClick={handleSaveVault} disabled={isSaving}>
+                {isSaving ? "Saving..." : "Save Automation Rules"}
+              </Button>
             </motion.div>
           )}
 
-          {/* Billing */}
           {activeSection === "billing" && (
             <motion.div variants={staggerContainer} initial="hidden" animate="visible">
-              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">
-                Billing
-              </motion.h2>
+              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">Billing</motion.h2>
               <motion.div variants={staggerItem} className="rounded-xl border border-[var(--aiva-blue-border)] bg-[var(--background-elevated)] p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <p className="text-lg font-semibold text-[var(--text-primary)]">Team Plan</p>
-                    <p className="text-sm text-[var(--text-secondary)]">$79/month &middot; 5 seats</p>
+                    <p className="text-sm text-[var(--text-secondary)]">$79/month</p>
                   </div>
                   <Badge variant="blue">Active</Badge>
                 </div>
@@ -262,12 +334,9 @@ export default function SettingsPage() {
             </motion.div>
           )}
 
-          {/* Security */}
           {activeSection === "security" && (
             <motion.div variants={staggerContainer} initial="hidden" animate="visible">
-              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">
-                Security
-              </motion.h2>
+              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">Security</motion.h2>
               <motion.div variants={staggerItem} className="space-y-4">
                 <div className="flex items-center gap-3 h-14 border-b border-[var(--border-subtle)]">
                   <Lock size={16} className="text-[var(--text-secondary)]" />

@@ -1,38 +1,102 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Button, Badge, Avatar, ProgressBar, Card } from "@/components/ui";
+import { Button, Badge, Avatar, ProgressBar, LoadingBar } from "@/components/ui";
 import { linearFadeIn } from "@/lib/animations";
+import { fetchThread, fetchMessages, fetchDraft, fetchShopifyCustomer, fetchShopifyOrders } from "@/lib/supabase/queries";
+import { useSupabaseQuery } from "@/hooks/use-supabase-query";
 import {
-  ArrowLeft, Send, X, Sparkles, Lock, Package, Mail,
+  ArrowLeft, Send, X, Sparkles, Lock, Package,
   ExternalLink, Copy, ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 
-const mockThread = {
-  subject: "Where is my order? Order #1042",
-  sender: { name: "Emily Torres", email: "emily@example.com", initials: "ET" },
-  confidenceScore: 92,
-  messages: [
-    {
-      id: "1",
-      direction: "inbound" as "inbound" | "outbound",
-      sender: "Emily Torres",
-      text: "Hi, I placed an order for Blue Widgets (x2) last week and haven't received any shipping confirmation. Can you check on Order #1042 for me? Thanks!",
-      time: "3 hours ago",
-    },
-  ],
-  draft: "Hi Emily, thanks for reaching out! I checked on Order #1042 — it was fulfilled yesterday and shipped via USPS. Your tracking number is 1Z999AA10123456784. You should receive it within 2-3 business days. Let me know if you need anything else!",
-};
-
 export default function ConversationPage() {
-  const [draftText, setDraftText] = useState(mockThread.draft);
+  const params = useParams();
+  const router = useRouter();
+  const threadId = params.threadId as string;
+
+  const { data: thread, isLoading: threadLoading } = useSupabaseQuery(
+    () => fetchThread(threadId), [threadId]
+  );
+  const { data: messages, isLoading: messagesLoading } = useSupabaseQuery(
+    () => fetchMessages(threadId), [threadId]
+  );
+  const { data: draft } = useSupabaseQuery(
+    () => fetchDraft(threadId), [threadId]
+  );
+
+  const senderEmail = messages?.[0]?.sender_email || "";
+  const { data: shopifyCustomer } = useSupabaseQuery(
+    () => senderEmail ? fetchShopifyCustomer(senderEmail) : Promise.resolve(null),
+    [senderEmail]
+  );
+  const { data: shopifyOrders } = useSupabaseQuery(
+    () => senderEmail ? fetchShopifyOrders(senderEmail) : Promise.resolve([]),
+    [senderEmail]
+  );
+
+  const [draftText, setDraftText] = useState("");
   const [activeTone, setActiveTone] = useState("Professional");
-  const [isEditing, setIsEditing] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+
+  useEffect(() => {
+    if (draft?.content) setDraftText(draft.content);
+  }, [draft]);
+
+  const confidenceScore = draft?.confidence_score || thread?.confidence_score || 0;
+
+  const handleSend = async () => {
+    setIsSending(true);
+    try {
+      await fetch("/api/integrations/send-message", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId,
+          finalText: draftText,
+          originalAIVADraft: draft?.content || "",
+          channel: thread?.provider || "GMAIL",
+        }),
+      });
+      router.push("/app/inbox");
+    } catch {
+      setIsSending(false);
+    }
+  };
+
+  const handleToneChange = async (tone: string) => {
+    setActiveTone(tone);
+    try {
+      const res = await fetch("/api/ai/rewrite-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ draft: draftText, tone }),
+      });
+      const data = await res.json();
+      if (data.draft) setDraftText(data.draft);
+    } catch { /* keep current draft */ }
+  };
+
+  const isLoading = threadLoading || messagesLoading;
+
+  // Keyboard: Cmd+Enter to send
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && draftText) {
+        handleSend();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
 
   return (
     <div className="h-screen flex flex-col">
+      {isLoading && <LoadingBar />}
+
       {/* Header */}
       <div className="h-14 border-b border-[var(--border-subtle)] px-4 flex items-center gap-3 shrink-0">
         <Link
@@ -43,18 +107,22 @@ export default function ConversationPage() {
         </Link>
         <div className="flex-1 min-w-0">
           <h1 className="text-sm font-medium text-[var(--text-primary)] truncate">
-            {mockThread.subject}
+            {thread?.subject || "Loading..."}
           </h1>
           <div className="flex items-center gap-2">
-            <Badge variant="high" size="sm">HIGH</Badge>
-            <span className="text-xs text-[var(--text-tertiary)]">via Shopify</span>
+            {thread?.priority && (
+              <Badge variant={thread.priority === "URGENT" ? "urgent" : thread.priority === "HIGH" ? "high" : "default"} size="sm">
+                {thread.priority}
+              </Badge>
+            )}
+            <span className="text-xs text-[var(--text-tertiary)]">via {thread?.provider || "..."}</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        {confidenceScore > 0 && (
           <Badge variant="blue" size="md" className="font-mono">
-            Auto-Send Confidence: {mockThread.confidenceScore}%
+            Auto-Send Confidence: {Math.round(confidenceScore * 100)}%
           </Badge>
-        </div>
+        )}
       </div>
 
       {/* Split view: Thread + CRM panel */}
@@ -62,85 +130,95 @@ export default function ConversationPage() {
         {/* Thread + Draft */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {mockThread.messages.map((msg) => (
+          <div className={`flex-1 overflow-y-auto p-6 space-y-4 transition-opacity ${isLoading ? "opacity-50" : ""}`}>
+            {(messages || []).map((msg) => (
               <motion.div
                 key={msg.id}
                 variants={linearFadeIn}
                 initial="hidden"
                 animate="visible"
-                className={`max-w-lg ${msg.direction === "outbound" ? "ml-auto" : ""}`}
+                className={`max-w-lg ${msg.direction === "OUTBOUND" ? "ml-auto" : ""}`}
               >
                 <div className="flex items-center gap-2 mb-1.5">
-                  <Avatar initials={mockThread.sender.initials} size="sm" />
-                  <span className="text-xs font-medium text-[var(--text-primary)]">{msg.sender}</span>
-                  <span className="text-[10px] text-[var(--text-tertiary)]">{msg.time}</span>
+                  <Avatar initials={msg.sender_name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || "?"} size="sm" />
+                  <span className="text-xs font-medium text-[var(--text-primary)]">{msg.sender_name}</span>
+                  <span className="text-[10px] text-[var(--text-tertiary)]">
+                    {msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                  </span>
                 </div>
                 <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background-elevated)] p-4">
-                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{msg.text}</p>
+                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+                    {msg.body_plain || ""}
+                  </p>
                 </div>
               </motion.div>
             ))}
 
-            {/* Shopify Widget injection */}
-            <motion.div
-              variants={linearFadeIn}
-              initial="hidden"
-              animate="visible"
-              className="max-w-lg"
-            >
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="h-6 w-6 rounded-full bg-[var(--aiva-blue-glow)] flex items-center justify-center">
-                  <Sparkles size={10} className="text-[var(--aiva-blue)]" />
-                </div>
-                <span className="text-xs font-medium text-[var(--text-primary)]">AIVA</span>
-                <span className="text-[10px] text-[var(--text-tertiary)]">context resolved</span>
-              </div>
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background-main)] p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Package size={14} className="text-[var(--text-tertiary)]" />
-                    <span className="text-xs font-mono text-[var(--text-primary)]">Order #1042</span>
+            {/* Shopify widget if orders exist */}
+            {shopifyOrders && shopifyOrders.length > 0 && (
+              <motion.div variants={linearFadeIn} initial="hidden" animate="visible" className="max-w-lg">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <div className="h-6 w-6 rounded-full bg-[var(--aiva-blue-glow)] flex items-center justify-center">
+                    <Sparkles size={10} className="text-[var(--aiva-blue)]" />
                   </div>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[var(--status-success-bg)] text-[var(--status-success)]">
-                    FULFILLED
-                  </span>
+                  <span className="text-xs font-medium text-[var(--text-primary)]">AIVA</span>
+                  <span className="text-[10px] text-[var(--text-tertiary)]">context resolved</span>
                 </div>
-                <div className="space-y-1.5 mb-3">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-[var(--text-secondary)]">Blue Widget x2</span>
-                    <span className="font-mono text-[var(--text-primary)]">$300.00</span>
+                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background-main)] p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Package size={14} className="text-[var(--text-tertiary)]" />
+                      <span className="text-xs font-mono text-[var(--text-primary)]">
+                        {shopifyOrders[0].order_name || `Order #${shopifyOrders[0].shopify_order_id}`}
+                      </span>
+                    </div>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+                      shopifyOrders[0].fulfillment_status === "fulfilled"
+                        ? "bg-[var(--status-success-bg)] text-[var(--status-success)]"
+                        : "bg-[var(--status-warning-bg)] text-[var(--status-warning)]"
+                    }`}>
+                      {(shopifyOrders[0].fulfillment_status || "UNFULFILLED").toUpperCase()}
+                    </span>
+                  </div>
+                  {shopifyOrders[0].line_items_summary && (
+                    <div className="space-y-1.5 mb-3">
+                      {(shopifyOrders[0].line_items_summary as Array<{ title: string; qty: number }>).map((item, i) => (
+                        <div key={i} className="flex justify-between text-xs">
+                          <span className="text-[var(--text-secondary)]">{item.title} x{item.qty}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)]">
+                    <span className="text-xs font-mono text-[var(--text-primary)]">
+                      ${shopifyOrders[0].total_price || "0.00"}
+                    </span>
+                    <button className="text-[10px] font-medium text-[var(--aiva-blue)] hover:underline flex items-center gap-1">
+                      Insert Tracking into Draft <ChevronDown size={10} />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)]">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-[var(--text-tertiary)]">USPS 1Z999AA1...</span>
-                  </div>
-                  <button className="text-[10px] font-medium text-[var(--aiva-blue)] hover:underline flex items-center gap-1">
-                    Insert Tracking into Draft
-                    <ChevronDown size={10} />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            )}
           </div>
 
           {/* AI Draft Box */}
           <div className="border-t border-[var(--border-subtle)] bg-[var(--background-elevated)]">
-            {/* Confidence bar */}
-            <div className="px-4 pt-3">
-              <ProgressBar value={mockThread.confidenceScore} />
-              <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
-                Auto-Send Confidence: {mockThread.confidenceScore}% &middot; Safe to auto-send
-              </p>
-            </div>
+            {confidenceScore > 0 && (
+              <div className="px-4 pt-3">
+                <ProgressBar value={confidenceScore * 100} />
+                <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
+                  Auto-Send Confidence: {Math.round(confidenceScore * 100)}%
+                  {confidenceScore >= 0.85 ? " · Safe to auto-send" : " · Manual review required"}
+                </p>
+              </div>
+            )}
 
-            {/* Tone controls */}
             <div className="px-4 pt-3 flex gap-2">
               {["Friendly", "Professional", "Brief"].map((tone) => (
                 <button
                   key={tone}
-                  onClick={() => setActiveTone(tone)}
+                  onClick={() => handleToneChange(tone)}
                   className={`text-[10px] font-medium px-2.5 py-1 rounded-md border transition-all duration-150 ${
                     activeTone === tone
                       ? "border-[var(--aiva-blue-border)] text-[var(--aiva-blue)] bg-[var(--aiva-blue-glow)]"
@@ -152,34 +230,26 @@ export default function ConversationPage() {
               ))}
             </div>
 
-            {/* Text area */}
             <div className="p-4">
               <textarea
                 value={draftText}
-                onChange={(e) => {
-                  setDraftText(e.target.value);
-                  setIsEditing(true);
-                }}
+                onChange={(e) => setDraftText(e.target.value)}
                 className="w-full min-h-[80px] bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none resize-none leading-relaxed"
                 placeholder="Write your reply..."
               />
             </div>
 
-            {/* Action row */}
             <div className="px-4 pb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setDraftText("")}>
-                  <X size={14} />
-                  Discard
-                </Button>
-              </div>
+              <Button variant="ghost" size="sm" onClick={() => setDraftText("")}>
+                <X size={14} /> Discard
+              </Button>
               <div className="flex items-center gap-2">
                 <button className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]">
                   <Lock size={14} />
                 </button>
-                <Button variant="blue" size="md">
+                <Button variant="blue" size="md" onClick={handleSend} disabled={isSending || !draftText}>
                   <Send size={14} />
-                  Approve & Send
+                  {isSending ? "Sending..." : "Approve & Send"}
                   <kbd className="text-[9px] font-mono opacity-60 ml-1">⌘↵</kbd>
                 </Button>
               </div>
@@ -187,53 +257,70 @@ export default function ConversationPage() {
           </div>
         </div>
 
-        {/* CRM Panel - Right sidebar */}
+        {/* CRM Panel */}
         <div className="hidden xl:flex w-[300px] border-l border-[var(--border-subtle)] bg-[var(--background-elevated)] flex-col overflow-y-auto">
-          {/* Identity card */}
           <div className="p-4 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-3 mb-3">
-              <Avatar initials="ET" size="lg" />
+              <Avatar
+                initials={messages?.[0]?.sender_name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || "?"}
+                size="lg"
+              />
               <div>
-                <p className="text-sm font-medium text-[var(--text-primary)]">Emily Torres</p>
-                <p className="text-xs text-[var(--text-tertiary)]">emily@example.com</p>
+                <p className="text-sm font-medium text-[var(--text-primary)]">
+                  {messages?.[0]?.sender_name || "Unknown"}
+                </p>
+                <p className="text-xs text-[var(--text-tertiary)]">{senderEmail}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="font-mono text-[var(--status-warning)]">
-                $450.00 LTV
-              </Badge>
-              <Badge variant="outline">Returning Customer</Badge>
+            <div className="flex items-center gap-2 flex-wrap">
+              {shopifyCustomer?.total_spent && (
+                <Badge variant="outline" className="font-mono text-[var(--status-warning)]">
+                  ${Number(shopifyCustomer.total_spent).toFixed(2)} LTV
+                </Badge>
+              )}
+              {shopifyCustomer?.orders_count && (
+                <Badge variant="outline">
+                  {shopifyCustomer.orders_count > 5 ? "VIP" : shopifyCustomer.orders_count > 1 ? "Returning" : "New"} Customer
+                </Badge>
+              )}
             </div>
           </div>
 
-          {/* Order history */}
-          <div className="p-4">
-            <h3 className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)] mb-3">
-              Order History
-            </h3>
-            <div className="space-y-2">
-              {[
-                { id: "#1042", date: "Feb 20", status: "Fulfilled", amount: "$300.00" },
-                { id: "#1038", date: "Feb 10", status: "Fulfilled", amount: "$150.00" },
-              ].map((order) => (
-                <div key={order.id} className="rounded-lg border border-[var(--border-subtle)] p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-mono text-[var(--text-primary)]">{order.id}</span>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[var(--status-success)]" />
-                      <span className="text-[10px] text-[var(--text-tertiary)]">{order.status}</span>
+          {shopifyOrders && shopifyOrders.length > 0 && (
+            <div className="p-4">
+              <h3 className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)] mb-3">
+                Order History
+              </h3>
+              <div className="space-y-2">
+                {shopifyOrders.map((order) => (
+                  <div key={order.id} className="rounded-lg border border-[var(--border-subtle)] p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-mono text-[var(--text-primary)]">
+                        {order.order_name || `#${order.shopify_order_id}`}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-1.5 h-1.5 rounded-full ${
+                          order.fulfillment_status === "fulfilled" ? "bg-[var(--status-success)]" : "bg-[var(--status-warning)]"
+                        }`} />
+                        <span className="text-[10px] text-[var(--text-tertiary)]">
+                          {order.fulfillment_status || "Unfulfilled"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-[var(--text-tertiary)]">
+                        {order.created_at ? new Date(order.created_at).toLocaleDateString() : ""}
+                      </span>
+                      <span className="text-xs font-mono text-[var(--text-secondary)]">
+                        ${order.total_price || "0.00"}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-[var(--text-tertiary)]">{order.date}</span>
-                    <span className="text-xs font-mono text-[var(--text-secondary)]">{order.amount}</span>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Quick actions */}
           <div className="p-4 border-t border-[var(--border-subtle)] mt-auto">
             <Button variant="ghost" size="sm" className="w-full justify-start">
               <Copy size={14} /> Copy Tracking Link

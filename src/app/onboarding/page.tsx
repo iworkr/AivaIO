@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button, ToggleSwitch, ProgressBar } from "@/components/ui";
 import { pageTransition } from "@/lib/animations";
+import { useAuth } from "@/hooks/use-auth";
+import { updateUserSettings } from "@/lib/supabase/queries";
 import {
   ArrowRight, Sun, Moon, Command, Mail, Hash, ShoppingBag,
   Sparkles, Bell, Newspaper,
@@ -39,10 +41,22 @@ export default function OnboardingPage() {
   const [changelog, setChangelog] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const router = useRouter();
+  const { user } = useAuth();
 
-  const next = () => {
-    if (step < totalSteps - 1) setStep(step + 1);
-    else router.push("/app/inbox");
+  const next = async () => {
+    if (step < totalSteps - 1) {
+      setStep(step + 1);
+    } else {
+      if (user) {
+        await updateUserSettings(user.id, {
+          theme: theme,
+          subscribe_changelog: changelog,
+          subscribe_marketing: marketing,
+          onboarding_completed: true,
+        });
+      }
+      router.push("/app/inbox");
+    }
   };
 
   const selectTheme = (t: "dark" | "light") => {
