@@ -10,7 +10,7 @@ import { useIntegrations } from "@/hooks/use-integrations";
 import { GmailIcon, SlackIcon, ShopifyIcon } from "@/components/icons/brand-icons";
 import { ConnectionModal } from "./connection-modal";
 import {
-  Command, Inbox, Star, PenLine, CheckSquare,
+  Command, Inbox, Star, PenLine, CheckSquare, Calendar,
   Settings, Search, ChevronsUpDown,
   Menu, X, Settings2,
 } from "lucide-react";
@@ -25,7 +25,8 @@ const mainLinks = [
   { icon: Inbox, label: "Inbox", href: "/app/inbox", badgeKey: "inbox" },
   { icon: Star, label: "VIP / Urgent", href: "/app/inbox?filter=vip" },
   { icon: PenLine, label: "Drafts", href: "/app/inbox?filter=drafts" },
-  { icon: CheckSquare, label: "Tasks", href: "/app/inbox?filter=tasks" },
+  { icon: CheckSquare, label: "Tasks", href: "/app/tasks" },
+  { icon: Calendar, label: "Calendar", href: "/app/tasks" },
 ];
 
 const INTEGRATION_META: Record<string, { icon: React.FC<{ size?: number; className?: string }>; label: string }> = {
@@ -82,6 +83,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               const Icon = link.icon;
               const isActive = pathname === link.href ||
                 (link.href === "/app/inbox" && pathname?.startsWith("/app/inbox")) ||
+                (link.href === "/app/tasks" && pathname?.startsWith("/app/tasks")) ||
                 (link.href === "/app" && pathname === "/app");
               return (
                 <Link

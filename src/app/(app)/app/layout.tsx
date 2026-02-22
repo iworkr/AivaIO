@@ -6,7 +6,7 @@ import { Sidebar } from "@/components/app/sidebar";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { LearningToast } from "@/components/app/learning-toast";
 import { Toast, CommandPalette, CommandItem, CommandGroup } from "@/components/ui";
-import { Home, Inbox, Star, FileText, Settings, Zap, Clock, Shield, CheckCircle } from "lucide-react";
+import { Home, Inbox, Star, FileText, Settings, Zap, Clock, Shield, CheckCircle, CheckSquare } from "lucide-react";
 
 function IntegrationSuccessDetector({ onSuccess }: { onSuccess: (msg: string) => void }) {
   const searchParams = useSearchParams();
@@ -63,6 +63,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </CommandItem>
           <CommandItem icon={<FileText size={14} />} shortcut="G D" onClick={() => { router.push("/app/inbox?filter=drafts"); setCmdOpen(false); }}>
             Drafts
+          </CommandItem>
+          <CommandItem icon={<CheckSquare size={14} />} shortcut="G T" onClick={() => { router.push("/app/tasks"); setCmdOpen(false); }}>
+            Tasks & Calendar
           </CommandItem>
           <CommandItem icon={<Settings size={14} />} shortcut="G S" onClick={() => { router.push("/app/settings"); setCmdOpen(false); }}>
             Settings

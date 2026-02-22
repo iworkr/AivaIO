@@ -223,6 +223,115 @@ export function subscribeToMessages(workspaceId: string, callback: (payload: unk
     .subscribe();
 }
 
+/* ════════════ Task & Calendar Queries ════════════ */
+
+export async function fetchTasks(filter?: { status?: string; priority?: string; tag?: string }) {
+  let query = supabase
+    .from("tasks")
+    .select("*, subtasks(id, title, is_completed, sort_order)")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: false });
+
+  if (filter?.status) query = query.eq("status", filter.status);
+  if (filter?.priority) query = query.eq("priority", filter.priority);
+  if (filter?.tag) query = query.contains("tags", [filter.tag]);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createTask(task: {
+  user_id: string;
+  title: string;
+  description?: string;
+  priority?: string;
+  due_date?: string;
+  tags?: string[];
+}) {
+  const { data, error } = await supabase.from("tasks").insert(task).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateTask(taskId: string, updates: Record<string, unknown>) {
+  const { data, error } = await supabase
+    .from("tasks")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", taskId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteTask(taskId: string) {
+  const { error } = await supabase.from("tasks").delete().eq("id", taskId);
+  if (error) throw error;
+}
+
+export async function createSubtask(subtask: { task_id: string; title: string; sort_order?: number }) {
+  const { data, error } = await supabase.from("subtasks").insert(subtask).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateSubtask(subtaskId: string, updates: Record<string, unknown>) {
+  const { data, error } = await supabase.from("subtasks").update(updates).eq("id", subtaskId).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteSubtask(subtaskId: string) {
+  const { error } = await supabase.from("subtasks").delete().eq("id", subtaskId);
+  if (error) throw error;
+}
+
+export async function fetchCalendarEvents(start: string, end: string) {
+  const { data, error } = await supabase
+    .from("calendar_events")
+    .select("*, tasks(id, title, status, priority)")
+    .gte("start_time", start)
+    .lte("end_time", end)
+    .order("start_time", { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createCalendarEvent(event: {
+  user_id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  description?: string;
+  location?: string;
+  color?: string;
+  task_id?: string;
+}) {
+  const { data, error } = await supabase.from("calendar_events").insert(event).select().single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateCalendarEvent(eventId: string, updates: Record<string, unknown>) {
+  const { data, error } = await supabase
+    .from("calendar_events")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", eventId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteCalendarEvent(eventId: string) {
+  const { error } = await supabase.from("calendar_events").delete().eq("id", eventId);
+  if (error) throw error;
+}
+
+/* ════════════ Thread Helpers ════════════ */
+
 function mapThread(row: Record<string, unknown>): Thread {
   const contact = row.contacts as Record<string, string> | null;
   const participants = row.participants as Array<{ name: string; email: string }> | null;

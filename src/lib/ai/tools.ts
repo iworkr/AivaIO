@@ -67,6 +67,52 @@ export const TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "list_tasks",
+      description: "Lists the user's tasks with optional filtering. Use when the user asks about their tasks, to-do list, or action items.",
+      parameters: {
+        type: "object",
+        properties: {
+          status: { type: "string", enum: ["todo", "in_progress", "done"], description: "Filter by task status" },
+          priority: { type: "string", enum: ["high", "medium", "low"], description: "Filter by priority" },
+        },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "create_task",
+      description: "Creates a new task for the user. Use when the user asks to add a task, reminder, or to-do item.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "The task title" },
+          description: { type: "string", description: "Optional task description" },
+          priority: { type: "string", enum: ["high", "medium", "low"], description: "Task priority (default: medium)" },
+          due_date: { type: "string", description: "ISO date string for the deadline" },
+        },
+        required: ["title"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_calendar_events",
+      description: "Fetches the user's calendar events for a date range. Use when the user asks about their schedule, meetings, or calendar.",
+      parameters: {
+        type: "object",
+        properties: {
+          date_from: { type: "string", description: "ISO date string for start of range" },
+          date_to: { type: "string", description: "ISO date string for end of range" },
+        },
+        required: ["date_from", "date_to"],
+      },
+    },
+  },
 ];
 
 export async function executeToolCall(
@@ -83,6 +129,12 @@ export async function executeToolCall(
       return getShopifyOrders(supabase, args);
     case "get_contact_info":
       return getContactInfo(supabase, args);
+    case "list_tasks":
+      return listTasks(supabase, args);
+    case "create_task":
+      return createTaskTool(supabase, args);
+    case "get_calendar_events":
+      return getCalendarEventsTool(supabase, args);
     default:
       return JSON.stringify({ error: `Unknown tool: ${toolName}` });
   }
@@ -226,4 +278,57 @@ async function getContactInfo(supabase: SupabaseClient, args: Record<string, unk
   if (error) return JSON.stringify({ error: error.message });
 
   return JSON.stringify({ contacts: data || [], count: (data || []).length });
+}
+
+async function listTasks(supabase: SupabaseClient, args: Record<string, unknown>): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return JSON.stringify({ error: "Not authenticated" });
+
+  let query = supabase
+    .from("tasks")
+    .select("id, title, status, priority, due_date, tags, created_at, subtasks(id, title, is_completed)")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(25);
+
+  if (args.status) query = query.eq("status", args.status as string);
+  if (args.priority) query = query.eq("priority", args.priority as string);
+
+  const { data, error } = await query;
+  if (error) return JSON.stringify({ error: error.message });
+
+  return JSON.stringify({ tasks: data || [], count: (data || []).length });
+}
+
+async function createTaskTool(supabase: SupabaseClient, args: Record<string, unknown>): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return JSON.stringify({ error: "Not authenticated" });
+
+  const { data, error } = await supabase.from("tasks").insert({
+    user_id: user.id,
+    title: args.title as string,
+    description: (args.description as string) || null,
+    priority: (args.priority as string) || "medium",
+    due_date: (args.due_date as string) || null,
+  }).select().single();
+
+  if (error) return JSON.stringify({ error: error.message });
+  return JSON.stringify({ task: data, message: "Task created successfully" });
+}
+
+async function getCalendarEventsTool(supabase: SupabaseClient, args: Record<string, unknown>): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return JSON.stringify({ error: "Not authenticated" });
+
+  const { data, error } = await supabase
+    .from("calendar_events")
+    .select("id, title, start_time, end_time, location, color, task_id")
+    .eq("user_id", user.id)
+    .gte("start_time", args.date_from as string)
+    .lte("end_time", args.date_to as string)
+    .order("start_time", { ascending: true })
+    .limit(50);
+
+  if (error) return JSON.stringify({ error: error.message });
+  return JSON.stringify({ events: data || [], count: (data || []).length });
 }
