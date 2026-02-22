@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
 import { useSupabaseQuery } from "@/hooks/use-supabase-query";
 import { fetchThreads } from "@/lib/supabase/queries";
-import { AIResponseRenderer, ResearchingState } from "@/components/widgets";
+import { AIResponseRenderer, ResearchingState, CitationPill } from "@/components/widgets";
 import type { AIResponse } from "@/types";
 import {
   ArrowUp, Paperclip, Mic, Sparkles,
@@ -185,13 +185,15 @@ export default function DashboardPage() {
   return (
     <div className="h-screen flex flex-col bg-[#000000]">
 
+      <AnimatePresence mode="wait">
       {/* ═══════ BRIEFING STATE ═══════ */}
-      <AnimatePresence>
-        {!chatActive && (
+      {!chatActive ? (
           <motion.div
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.3 }}
+            key="briefing"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
             className="flex-1 flex flex-col items-center justify-center px-6"
           >
             {/* Greeting */}
@@ -327,12 +329,14 @@ export default function DashboardPage() {
               </p>
             </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ═══════ ACTIVE CHAT STATE ═══════ */}
-      {chatActive && (
-        <div className="flex-1 flex flex-col overflow-hidden">
+        ) : (
+        <motion.div
+          key="chat"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
+          className="flex-1 flex flex-col overflow-hidden"
+        >
           {/* Chat feed */}
           <div className="flex-1 overflow-y-auto">
             <div className="max-w-4xl mx-auto px-6">
@@ -362,15 +366,19 @@ export default function DashboardPage() {
                         {msg.text && (
                           <p className="text-[15px] text-[#F4F4F5] leading-relaxed">
                             {msg.text}
-                            {msg.citations?.map((cite) => (
-                              <span
-                                key={cite.id}
-                                className="inline-flex items-center mx-0.5 px-1.5 py-0.5 rounded-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[10px] text-[var(--text-tertiary)] cursor-help"
-                                title={cite.snippet}
-                              >
-                                {cite.source === "gmail" ? "G" : cite.source === "shopify" ? "S" : cite.source[0].toUpperCase()}
+                            {msg.citations && msg.citations.length > 0 && (
+                              <span className="inline-flex items-center gap-1 ml-1.5">
+                                {msg.citations.map((cite) => (
+                                  <CitationPill
+                                    key={cite.id}
+                                    source={cite.source}
+                                    label={cite.source === "gmail" ? "Gmail" : cite.source === "shopify" ? "Shopify" : cite.source}
+                                    snippet={cite.snippet}
+                                    messageId={cite.id}
+                                  />
+                                ))}
                               </span>
-                            ))}
+                            )}
                           </p>
                         )}
                         {msg.widgets && msg.widgets.length > 0 && (
@@ -481,8 +489,9 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-        </div>
-      )}
+        </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
