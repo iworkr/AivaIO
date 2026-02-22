@@ -37,9 +37,10 @@ function formatMessageTime(dateStr: string): string {
 }
 
 const PROMO_DOMAINS = [
-  "noreply", "no-reply", "notifications", "news", "updates", "marketing",
-  "promo", "deals", "offers", "newsletter", "recommendations", "info@",
-  "mailer-daemon", "donotreply", "do-not-reply", "bounce",
+  "noreply", "no-reply", "no_reply", "do-not-reply", "do_not_reply", "donotreply",
+  "notifications", "news", "updates", "marketing", "promo", "deals", "offers",
+  "newsletter", "recommendations", "info@", "mailer-daemon", "bounce",
+  "smailer", "mailer", "digest", "announce", "campaign", "bulk",
 ];
 
 function classifySender(email: string, hasShopify: boolean): ContextState {
