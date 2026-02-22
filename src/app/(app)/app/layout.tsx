@@ -6,7 +6,7 @@ import { Sidebar } from "@/components/app/sidebar";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { LearningToast } from "@/components/app/learning-toast";
 import { CommandPalette, CommandItem, CommandGroup } from "@/components/ui";
-import { Inbox, Star, FileText, Settings, Zap, Clock, Shield } from "lucide-react";
+import { Home, Inbox, Star, FileText, Settings, Zap, Clock, Shield } from "lucide-react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
@@ -33,6 +33,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen}>
         <CommandGroup label="Navigation">
+          <CommandItem icon={<Home size={14} />} shortcut="G H" onClick={() => { router.push("/app"); setCmdOpen(false); }}>
+            Go to Home
+          </CommandItem>
           <CommandItem icon={<Inbox size={14} />} shortcut="G I" onClick={() => { router.push("/app/inbox"); setCmdOpen(false); }}>
             Go to Inbox
           </CommandItem>

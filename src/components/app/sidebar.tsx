@@ -7,7 +7,7 @@ import { Avatar, Badge } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import {
-  Inbox, Star, FileText, CheckSquare,
+  Home, Inbox, Star, FileText, CheckSquare,
   Settings, Sun, Moon, ChevronDown,
   Menu, X,
 } from "lucide-react";
@@ -18,6 +18,7 @@ interface SidebarProps {
 }
 
 const mainLinks = [
+  { icon: Home, label: "Home", href: "/app" },
   { icon: Inbox, label: "Inbox", href: "/app/inbox", badge: "12" },
   { icon: Star, label: "VIP / Urgent", href: "/app/inbox?filter=vip" },
   { icon: FileText, label: "Drafts", href: "/app/inbox?filter=drafts" },
@@ -77,7 +78,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <div className="space-y-0.5">
             {mainLinks.map((link) => {
               const Icon = link.icon;
-              const isActive = pathname === link.href || (link.href === "/app/inbox" && pathname?.startsWith("/app/inbox"));
+              const isActive = pathname === link.href ||
+                (link.href === "/app/inbox" && pathname?.startsWith("/app/inbox")) ||
+                (link.href === "/app" && pathname === "/app");
               return (
                 <Link
                   key={link.label}
