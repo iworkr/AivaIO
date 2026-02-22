@@ -107,32 +107,6 @@ export default function InboxPage() {
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
-  const handleBulkArchive = useCallback(async () => {
-    if (selectedIds.size === 0) return;
-    setActionLoading(true);
-    try {
-      const supabase = createClient();
-      await supabase.from("threads").update({ is_archived: true }).in("id", Array.from(selectedIds));
-      setSelectedIds(new Set());
-      await loadThreads();
-    } catch { /* ignore */ } finally {
-      setActionLoading(false);
-    }
-  }, [selectedIds, loadThreads]);
-
-  const handleBulkMarkRead = useCallback(async () => {
-    if (selectedIds.size === 0) return;
-    setActionLoading(true);
-    try {
-      const supabase = createClient();
-      await supabase.from("threads").update({ is_unread: false }).in("id", Array.from(selectedIds));
-      setSelectedIds(new Set());
-      await loadThreads();
-    } catch { /* ignore */ } finally {
-      setActionLoading(false);
-    }
-  }, [selectedIds, loadThreads]);
-
   const triggerSync = useCallback(async () => {
     if (isSyncing) return;
     setIsSyncing(true);
@@ -160,6 +134,32 @@ export default function InboxPage() {
       setIsLoading(false);
     }
   }, [activeFilter]);
+
+  const handleBulkArchive = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setActionLoading(true);
+    try {
+      const supabase = createClient();
+      await supabase.from("threads").update({ is_archived: true }).in("id", Array.from(selectedIds));
+      setSelectedIds(new Set());
+      await loadThreads();
+    } catch { /* ignore */ } finally {
+      setActionLoading(false);
+    }
+  }, [selectedIds, loadThreads]);
+
+  const handleBulkMarkRead = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setActionLoading(true);
+    try {
+      const supabase = createClient();
+      await supabase.from("threads").update({ is_unread: false }).in("id", Array.from(selectedIds));
+      setSelectedIds(new Set());
+      await loadThreads();
+    } catch { /* ignore */ } finally {
+      setActionLoading(false);
+    }
+  }, [selectedIds, loadThreads]);
 
   useEffect(() => {
     let cancelled = false;
