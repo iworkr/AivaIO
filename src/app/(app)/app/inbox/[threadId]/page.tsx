@@ -174,18 +174,18 @@ export default function ConversationPage() {
                 variants={linearFadeIn}
                 initial="hidden"
                 animate="visible"
-                className={`max-w-lg ${msg.direction === "OUTBOUND" ? "ml-auto" : ""}`}
+                className="max-w-lg"
               >
                 <div className="flex items-center gap-2 mb-1.5">
                   <Avatar initials={msg.sender_name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || "?"} size="sm" />
                   <span className="text-xs font-medium text-[var(--text-primary)]">{msg.sender_name}</span>
                   <span className="text-[10px] text-[var(--text-tertiary)]">
-                    {msg.created_at ? new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                    {(msg.created_at || msg.timestamp) ? new Date(msg.created_at || msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
                   </span>
                 </div>
                 <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background-elevated)] p-4">
                   <p className="text-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
-                    {msg.body_plain || ""}
+                    {msg.body_plain || msg.body || ""}
                   </p>
                 </div>
               </motion.div>

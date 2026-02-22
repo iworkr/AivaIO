@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Badge, DataRow, EmptyState, LoadingBar, LottieAnimation } from "@/components/ui";
@@ -9,7 +9,7 @@ import { fetchThreads, subscribeToMessages } from "@/lib/supabase/queries";
 import { useAuth } from "@/hooks/use-auth";
 import {
   Mail, Hash, Phone, ShoppingBag, Sparkles, Archive,
-  FileText, CheckCircle,
+  FileText, RefreshCw,
 } from "lucide-react";
 import type { Priority, MessageProvider, Thread } from "@/types";
 
@@ -47,25 +47,62 @@ export default function InboxPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const { user } = useAuth();
   const router = useRouter();
+  const hasSynced = useRef(false);
+
+  const triggerSync = useCallback(async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const res = await fetch("/api/sync/gmail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxResults: 25 }),
+      });
+      const data = await res.json();
+      return data;
+    } catch {
+      return null;
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isSyncing]);
 
   const loadThreads = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await fetchThreads(activeFilter === "All" ? undefined : activeFilter);
       setThreads(data);
+      return data;
     } catch {
       setThreads([]);
+      return [];
     } finally {
       setIsLoading(false);
     }
   }, [activeFilter]);
 
   useEffect(() => {
-    loadThreads();
-  }, [loadThreads]);
+    let cancelled = false;
+
+    async function init() {
+      const data = await loadThreads();
+
+      if (!cancelled && data.length === 0 && !hasSynced.current) {
+        hasSynced.current = true;
+        await triggerSync();
+        if (!cancelled) {
+          await loadThreads();
+        }
+      }
+    }
+
+    init();
+    return () => { cancelled = true; };
+  }, [loadThreads, triggerSync]);
 
   useEffect(() => {
     if (!user) return;
@@ -79,7 +116,6 @@ export default function InboxPage() {
     return () => { channel.unsubscribe(); };
   }, [user, loadThreads]);
 
-  // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -107,9 +143,14 @@ export default function InboxPage() {
     }
   }, [selectedIndex, threads]);
 
+  const handleManualSync = async () => {
+    await triggerSync();
+    await loadThreads();
+  };
+
   return (
     <div className="h-screen flex flex-col">
-      {isLoading && <LoadingBar />}
+      {(isLoading || isSyncing) && <LoadingBar />}
 
       {/* Top bar */}
       <div className="h-12 border-b border-[var(--border-subtle)] px-4 flex items-center gap-3 shrink-0">
@@ -129,13 +170,21 @@ export default function InboxPage() {
           ))}
         </div>
         <div className="flex-1" />
+        <button
+          onClick={handleManualSync}
+          disabled={isSyncing}
+          className="h-7 w-7 rounded-md flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-all disabled:opacity-50"
+          title="Sync emails"
+        >
+          <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
+        </button>
         <span className="text-xs text-[var(--text-tertiary)]">
           {threads.length} messages
         </span>
       </div>
 
       {/* Cold-start sync indicator */}
-      {isLoading && threads.length === 0 && (
+      {(isSyncing || isLoading) && threads.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <LottieAnimation
             src="/lottie/scanner.json"
@@ -143,13 +192,15 @@ export default function InboxPage() {
             autoplay
             style={{ width: 80, height: 80 }}
           />
-          <p className="text-xs text-[var(--text-tertiary)]">Syncing your channels…</p>
+          <p className="text-xs text-[var(--text-tertiary)]">
+            {isSyncing ? "Syncing your emails from Gmail…" : "Loading your inbox…"}
+          </p>
         </div>
       )}
 
       {/* Message list */}
-      <div className={`flex-1 overflow-y-auto transition-opacity duration-300 ${isLoading ? "opacity-50" : ""}`}>
-        {!isLoading && threads.length === 0 ? (
+      <div className={`flex-1 overflow-y-auto transition-opacity duration-300 ${isLoading || isSyncing ? "opacity-50" : ""}`}>
+        {!isLoading && !isSyncing && threads.length === 0 ? (
           <EmptyState
             icon={
               <LottieAnimation

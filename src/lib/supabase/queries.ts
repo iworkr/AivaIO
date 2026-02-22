@@ -1,23 +1,33 @@
 import { createClient } from "./client";
-import type { Thread, NormalizedMessage, ToneProfile, IntegrationConnection } from "@/types";
+import type { Thread, ToneProfile } from "@/types";
 
 const supabase = createClient();
+
+const PRIORITY_MAP: Record<string, string> = {
+  urgent: "URGENT",
+  high: "HIGH",
+  medium: "NORMAL",
+  low: "LOW",
+  noise: "FYI",
+};
 
 export async function fetchThreads(filter?: string) {
   let query = supabase
     .from("threads")
     .select(`
-      id, subject, provider, last_message_at, message_count, unread,
-      priority, snippet, has_draft, confidence_score,
-      contacts:contact_id (name, email)
+      id, primary_subject, provider, last_message_at, message_count,
+      is_unread, priority, snippet, has_draft, confidence_score,
+      participants, contact_id,
+      contacts:contact_id (full_name, email)
     `)
+    .eq("is_archived", false)
     .order("last_message_at", { ascending: false })
     .limit(50);
 
   if (filter === "Needs Review") {
     query = query.eq("has_draft", true);
   } else if (filter === "Urgent") {
-    query = query.in("priority", ["URGENT", "HIGH"]);
+    query = query.in("priority", ["urgent", "high"]);
   }
 
   const { data, error } = await query;
@@ -29,29 +39,41 @@ export async function fetchThread(threadId: string) {
   const { data, error } = await supabase
     .from("threads")
     .select(`
-      id, subject, provider, last_message_at, priority, confidence_score,
-      contacts:contact_id (name, email)
+      id, primary_subject, provider, last_message_at, priority,
+      confidence_score, participants,
+      contacts:contact_id (full_name, email)
     `)
     .eq("id", threadId)
     .single();
 
   if (error) throw error;
-  return data;
+
+  return {
+    ...data,
+    subject: data.primary_subject,
+    provider: (data.provider || "gmail").toUpperCase(),
+  };
 }
 
 export async function fetchMessages(threadId: string) {
   const { data, error } = await supabase
     .from("messages")
     .select(`
-      id, thread_id, provider, direction, sender_name, sender_email,
-      subject, body_plain, body_html, created_at, priority,
-      confidence_score, has_draft
+      id, thread_id, sender_name, sender_email,
+      subject, body, body_html, snippet, timestamp, priority,
+      confidence_score, has_draft_reply, is_read, recipients
     `)
     .eq("thread_id", threadId)
-    .order("created_at", { ascending: true });
+    .order("timestamp", { ascending: true });
 
   if (error) throw error;
-  return data || [];
+  return (data || []).map((msg) => ({
+    ...msg,
+    body_plain: msg.body,
+    created_at: msg.timestamp,
+    has_draft: msg.has_draft_reply,
+    direction: "INBOUND" as const,
+  }));
 }
 
 export async function fetchDraft(threadId: string) {
@@ -203,15 +225,26 @@ export function subscribeToMessages(workspaceId: string, callback: (payload: unk
 
 function mapThread(row: Record<string, unknown>): Thread {
   const contact = row.contacts as Record<string, string> | null;
+  const participants = row.participants as Array<{ name: string; email: string }> | null;
+
+  const dbPriority = (row.priority as string) || "medium";
+  const mappedPriority = PRIORITY_MAP[dbPriority] || "NORMAL";
+
+  const participantList = contact
+    ? [{ name: contact.full_name || contact.email, email: contact.email }]
+    : participants && Array.isArray(participants) && participants.length > 0
+      ? participants.map((p) => ({ name: p.name || p.email, email: p.email }))
+      : [];
+
   return {
     id: row.id as string,
-    subject: (row.subject as string) || "",
-    provider: (row.provider as string || "GMAIL") as Thread["provider"],
+    subject: (row.primary_subject as string) || "",
+    provider: ((row.provider as string) || "gmail").toUpperCase() as Thread["provider"],
     lastMessageAt: row.last_message_at as string,
     messageCount: (row.message_count as number) || 0,
-    unread: (row.unread as boolean) || false,
-    priority: (row.priority as string || "NORMAL") as Thread["priority"],
-    participants: contact ? [{ name: contact.name, email: contact.email }] : [],
+    unread: (row.is_unread as boolean) ?? true,
+    priority: mappedPriority as Thread["priority"],
+    participants: participantList,
     snippet: (row.snippet as string) || "",
     hasDraft: (row.has_draft as boolean) || false,
     confidenceScore: row.confidence_score as number | undefined,
