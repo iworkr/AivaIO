@@ -3,6 +3,7 @@
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import { linearFadeIn, viewportOnce } from "@/lib/animations";
+import { LottieAnimation } from "@/components/ui";
 import { Sparkles, MapPin, Package, Clock } from "lucide-react";
 
 export function GenerativeUI() {
@@ -67,6 +68,12 @@ export function GenerativeUI() {
                   <Sparkles size={12} className="text-[var(--aiva-blue)]" />
                 </div>
                 <span className="text-xs font-medium text-[var(--text-primary)]">AIVA</span>
+                <LottieAnimation
+                  src="/lottie/spinner.json"
+                  loop
+                  autoplay
+                  style={{ width: 16, height: 16 }}
+                />
                 <span className="text-[10px] font-mono text-[var(--text-tertiary)]">researching...</span>
               </div>
 

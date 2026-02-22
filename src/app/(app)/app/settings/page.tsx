@@ -15,6 +15,7 @@ import {
   User, Link2, Sliders, Shield, CreditCard, Lock,
   Mail, Hash, Phone, ShoppingBag, RefreshCw,
   ShieldAlert, Clock, DollarSign, Zap, AlertTriangle, FileText,
+  ChevronDown,
 } from "lucide-react";
 
 const settingsSections = [
@@ -32,6 +33,7 @@ const integrationIcons: Record<string, React.ElementType> = {
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState("profile");
+  const [settingsNavOpen, setSettingsNavOpen] = useState(false);
   const { user } = useAuth();
   const userId = user?.id || "";
   const workspaceId = (user?.user_metadata as Record<string, string>)?.workspace_id || "";
@@ -135,8 +137,40 @@ export default function SettingsPage() {
   });
 
   return (
-    <div className="h-screen flex overflow-hidden">
-      <div className="w-52 shrink-0 border-r border-[var(--border-subtle)] py-4 px-2 overflow-y-auto">
+    <div className="h-screen flex flex-col md:flex-row overflow-hidden">
+      {/* Mobile settings nav toggle */}
+      <div className="md:hidden border-b border-[var(--border-subtle)] px-4 py-2 flex items-center gap-2 shrink-0">
+        <button
+          onClick={() => setSettingsNavOpen(!settingsNavOpen)}
+          className="flex items-center gap-2 text-sm text-[var(--text-primary)] font-medium"
+        >
+          {settingsSections.find((s) => s.id === activeSection)?.label || "Settings"}
+          <ChevronDown size={14} className={`text-[var(--text-tertiary)] transition-transform ${settingsNavOpen ? "rotate-180" : ""}`} />
+        </button>
+      </div>
+      {settingsNavOpen && (
+        <div className="md:hidden border-b border-[var(--border-subtle)] px-2 pb-2 grid grid-cols-2 gap-1">
+          {settingsSections.map((section) => {
+            const Icon = section.icon;
+            return (
+              <button
+                key={section.id}
+                onClick={() => { setActiveSection(section.id); setSettingsNavOpen(false); }}
+                className={`flex items-center gap-2 h-8 px-3 rounded-md text-sm transition-colors ${
+                  activeSection === section.id
+                    ? "bg-[var(--surface-hover)] text-[var(--text-primary)]"
+                    : "text-[var(--text-secondary)]"
+                }`}
+              >
+                <Icon size={14} /> {section.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Desktop sidebar */}
+      <div className="hidden md:block w-52 shrink-0 border-r border-[var(--border-subtle)] py-4 px-2 overflow-y-auto">
         <p className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)] px-3 mb-2">
           Settings
         </p>
@@ -158,8 +192,8 @@ export default function SettingsPage() {
         })}
       </div>
 
-      <div className="flex-1 overflow-y-auto py-8">
-        <div className="max-w-xl mx-auto px-6">
+      <div className="flex-1 overflow-y-auto py-6 md:py-8">
+        <div className="max-w-xl mx-auto px-4 sm:px-6">
           {activeSection === "profile" && (
             <motion.div variants={staggerContainer} initial="hidden" animate="visible">
               <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">Profile</motion.h2>

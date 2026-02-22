@@ -1,4 +1,7 @@
+"use client";
+
 import { Package } from "lucide-react";
+import { LottieAnimation } from "@/components/ui";
 import type { ShopifyWidgetData } from "@/types";
 
 export function ShopifyWidget({ data }: { data: ShopifyWidgetData["data"] }) {
@@ -13,11 +16,18 @@ export function ShopifyWidget({ data }: { data: ShopifyWidgetData["data"] }) {
             {data.orderName}
           </span>
         </div>
-        <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
+        <span className={`text-[9px] px-1.5 py-0.5 rounded-full flex items-center gap-1 ${
           isFulfilled
             ? "bg-[var(--status-success-bg)] text-[var(--status-success)]"
             : "bg-[var(--status-warning-bg)] text-[var(--status-warning)]"
         }`}>
+          {isFulfilled && (
+            <LottieAnimation
+              src="/lottie/fulfilled-badge.json"
+              autoplay
+              style={{ width: 14, height: 14 }}
+            />
+          )}
           {data.fulfillmentStatus.toUpperCase()}
         </span>
       </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Badge, DataRow, EmptyState, LoadingBar } from "@/components/ui";
+import { Badge, DataRow, EmptyState, LoadingBar, LottieAnimation } from "@/components/ui";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { fetchThreads, subscribeToMessages } from "@/lib/supabase/queries";
 import { useAuth } from "@/hooks/use-auth";
@@ -134,11 +134,30 @@ export default function InboxPage() {
         </span>
       </div>
 
+      {/* Cold-start sync indicator */}
+      {isLoading && threads.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <LottieAnimation
+            src="/lottie/scanner.json"
+            loop
+            autoplay
+            style={{ width: 80, height: 80 }}
+          />
+          <p className="text-xs text-[var(--text-tertiary)]">Syncing your channels…</p>
+        </div>
+      )}
+
       {/* Message list */}
       <div className={`flex-1 overflow-y-auto transition-opacity duration-300 ${isLoading ? "opacity-50" : ""}`}>
         {!isLoading && threads.length === 0 ? (
           <EmptyState
-            icon={<CheckCircle size={32} />}
+            icon={
+              <LottieAnimation
+                src="/lottie/checkmark.json"
+                autoplay
+                style={{ width: 64, height: 64 }}
+              />
+            }
             title="Inbox Zero. All channels clear."
           />
         ) : (
@@ -165,16 +184,19 @@ export default function InboxPage() {
                         {badge.label}
                       </Badge>
                     )}
-                    <span className={`text-sm font-medium truncate w-28 shrink-0 ${
+                    <span className={`text-sm font-medium truncate w-20 sm:w-28 shrink-0 ${
                       thread.unread ? "text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
                     }`}>
                       {sender}
                     </span>
-                    <span className="text-sm text-[var(--text-secondary)] truncate flex-1">
+                    <span className="text-sm text-[var(--text-secondary)] truncate flex-1 hidden sm:inline">
                       {thread.subject || thread.snippet}
                     </span>
+                    <span className="text-xs text-[var(--text-secondary)] truncate flex-1 sm:hidden">
+                      {(thread.subject || thread.snippet || "").slice(0, 30)}
+                    </span>
                     {thread.hasDraft && (
-                      <Sparkles size={14} className="text-[var(--aiva-blue)] shrink-0" />
+                      <Sparkles size={14} className="text-[var(--aiva-blue)] shrink-0 hidden sm:block" />
                     )}
                     <span className="text-[10px] font-mono text-[var(--text-tertiary)] shrink-0 w-8 text-right">
                       {thread.lastMessageAt ? formatTime(thread.lastMessageAt) : ""}

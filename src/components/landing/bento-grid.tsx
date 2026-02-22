@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { staggerContainer, staggerItem, viewportOnce } from "@/lib/animations";
-import { BentoCard } from "@/components/ui";
+import { BentoCard, LottieAnimation } from "@/components/ui";
 import { Inbox, Zap, PenTool, LayoutGrid, ArrowDownUp, Sparkles, Package } from "lucide-react";
 
 export function BentoGrid() {
@@ -49,6 +49,14 @@ export function BentoGrid() {
                 </p>
               </div>
             </div>
+            <LottieAnimation
+              src="/lottie/inbox-merge.json"
+              loop
+              autoplay
+              playOnView
+              className="mb-4"
+              style={{ width: 120, height: 80 }}
+            />
             {/* Mock inbox preview */}
             <div className="rounded-lg border border-[var(--border-subtle)] overflow-hidden bg-[var(--background-main)]">
               {[
@@ -111,6 +119,14 @@ export function BentoGrid() {
             <p className="text-sm text-[var(--text-secondary)] mb-6 leading-relaxed">
               Reply faster without sounding robotic. Tone matched to you.
             </p>
+            <LottieAnimation
+              src="/lottie/typing-cursor.json"
+              loop
+              autoplay
+              playOnView
+              className="mb-3"
+              style={{ width: 48, height: 32 }}
+            />
             <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background-main)] p-3">
               <div className="flex gap-2 mb-3">
                 {["Friendly", "Professional", "Brief"].map((tone) => (

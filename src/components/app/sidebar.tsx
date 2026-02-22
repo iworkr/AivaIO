@@ -6,9 +6,10 @@ import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Avatar, Badge } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import {
-  Inbox, Star, FileText, CheckSquare, Mail, Hash, Phone,
-  ShoppingBag, Settings, Sun, Moon, ChevronDown, LogOut,
+  Inbox, Star, FileText, CheckSquare,
+  Settings, Sun, Moon, ChevronDown, LogOut,
   Menu, X,
 } from "lucide-react";
 
@@ -25,10 +26,10 @@ const mainLinks = [
 ];
 
 const integrations = [
-  { icon: Mail, label: "Gmail", status: "active" as const },
-  { icon: Hash, label: "Slack", status: "active" as const },
-  { icon: Phone, label: "WhatsApp", status: "disconnected" as const },
-  { icon: ShoppingBag, label: "Shopify", status: "active" as const },
+  { svg: "/icons/gmail.svg", label: "Gmail", status: "active" as const },
+  { svg: "/icons/slack.svg", label: "Slack", status: "active" as const },
+  { svg: "/icons/whatsapp.svg", label: "WhatsApp", status: "disconnected" as const },
+  { svg: "/icons/shopify.svg", label: "Shopify", status: "active" as const },
 ];
 
 const statusColors = {
@@ -117,19 +118,22 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               Integrations
             </p>
             <div className="space-y-0.5">
-              {integrations.map((int) => {
-                const Icon = int.icon;
-                return (
-                  <div
-                    key={int.label}
-                    className="flex items-center gap-3 h-7 px-2.5 text-sm text-[var(--text-secondary)]"
-                  >
-                    <Icon size={14} className="shrink-0 text-[var(--text-tertiary)]" />
-                    <span className="flex-1 truncate text-xs">{int.label}</span>
-                    <div className={cn("w-1.5 h-1.5 rounded-full", statusColors[int.status])} />
-                  </div>
-                );
-              })}
+              {integrations.map((int) => (
+                <div
+                  key={int.label}
+                  className="flex items-center gap-3 h-7 px-2.5 text-sm text-[var(--text-secondary)]"
+                >
+                  <Image
+                    src={int.svg}
+                    alt={int.label}
+                    width={14}
+                    height={14}
+                    className="shrink-0 opacity-60"
+                  />
+                  <span className="flex-1 truncate text-xs">{int.label}</span>
+                  <div className={cn("w-1.5 h-1.5 rounded-full", statusColors[int.status])} />
+                </div>
+              ))}
             </div>
           </div>
         </nav>

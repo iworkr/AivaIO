@@ -7,9 +7,11 @@ import { Button, Badge, Avatar, ProgressBar, LoadingBar } from "@/components/ui"
 import { linearFadeIn } from "@/lib/animations";
 import { fetchThread, fetchMessages, fetchDraft, fetchShopifyCustomer, fetchShopifyOrders } from "@/lib/supabase/queries";
 import { useSupabaseQuery } from "@/hooks/use-supabase-query";
+import { AIResponseRenderer } from "@/components/widgets";
+import type { AIResponse, ShopifyWidgetData } from "@/types";
 import {
-  ArrowLeft, Send, X, Sparkles, Lock, Package,
-  ExternalLink, Copy, ChevronDown,
+  ArrowLeft, Send, X, Sparkles, Lock,
+  ExternalLink, Copy, User,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -41,10 +43,39 @@ export default function ConversationPage() {
   const [draftText, setDraftText] = useState("");
   const [activeTone, setActiveTone] = useState("Professional");
   const [isSending, setIsSending] = useState(false);
+  const [aiResponse, setAiResponse] = useState<AIResponse | null>(null);
+  const [mobileCrmOpen, setMobileCrmOpen] = useState(false);
 
   useEffect(() => {
     if (draft?.content) setDraftText(draft.content);
   }, [draft]);
+
+  useEffect(() => {
+    if (!shopifyOrders || shopifyOrders.length === 0) return;
+    const order = shopifyOrders[0];
+    const widget: ShopifyWidgetData = {
+      type: "SHOPIFY_CARD",
+      data: {
+        orderId: order.shopify_order_id || "",
+        orderName: order.order_name || `#${order.shopify_order_id}`,
+        customerName: shopifyCustomer?.shopify_customer_id || "",
+        financialStatus: "paid",
+        fulfillmentStatus: (order.fulfillment_status as "fulfilled" | "unfulfilled" | "partial") || "unfulfilled",
+        totalPrice: order.total_price || "0.00",
+        currency: "$",
+        lineItems: (order.line_items_summary as Array<{ title: string; qty: number }> || []).map((item) => ({
+          title: item.title,
+          quantity: item.qty,
+          price: "0.00",
+        })),
+      },
+    };
+    setAiResponse({
+      textSummary: `Found ${shopifyOrders.length} order(s) for this customer.`,
+      widgets: [widget],
+      citations: [{ id: order.id || "shopify", source: "shopify", snippet: order.order_name || "" }],
+    });
+  }, [shopifyOrders, shopifyCustomer]);
 
   const confidenceScore = draft?.confidence_score || thread?.confidence_score || 0;
 
@@ -119,10 +150,16 @@ export default function ConversationPage() {
           </div>
         </div>
         {confidenceScore > 0 && (
-          <Badge variant="blue" size="md" className="font-mono">
+          <Badge variant="blue" size="md" className="font-mono hidden sm:inline-flex">
             Auto-Send Confidence: {Math.round(confidenceScore * 100)}%
           </Badge>
         )}
+        <button
+          onClick={() => setMobileCrmOpen(!mobileCrmOpen)}
+          className="xl:hidden h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+        >
+          <User size={16} />
+        </button>
       </div>
 
       {/* Split view: Thread + CRM panel */}
@@ -154,8 +191,8 @@ export default function ConversationPage() {
               </motion.div>
             ))}
 
-            {/* Shopify widget if orders exist */}
-            {shopifyOrders && shopifyOrders.length > 0 && (
+            {/* Dynamic AI widget rendering */}
+            {aiResponse && (
               <motion.div variants={linearFadeIn} initial="hidden" animate="visible" className="max-w-lg">
                 <div className="flex items-center gap-2 mb-1.5">
                   <div className="h-6 w-6 rounded-full bg-[var(--aiva-blue-glow)] flex items-center justify-center">
@@ -164,40 +201,7 @@ export default function ConversationPage() {
                   <span className="text-xs font-medium text-[var(--text-primary)]">AIVA</span>
                   <span className="text-[10px] text-[var(--text-tertiary)]">context resolved</span>
                 </div>
-                <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background-main)] p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Package size={14} className="text-[var(--text-tertiary)]" />
-                      <span className="text-xs font-mono text-[var(--text-primary)]">
-                        {shopifyOrders[0].order_name || `Order #${shopifyOrders[0].shopify_order_id}`}
-                      </span>
-                    </div>
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${
-                      shopifyOrders[0].fulfillment_status === "fulfilled"
-                        ? "bg-[var(--status-success-bg)] text-[var(--status-success)]"
-                        : "bg-[var(--status-warning-bg)] text-[var(--status-warning)]"
-                    }`}>
-                      {(shopifyOrders[0].fulfillment_status || "UNFULFILLED").toUpperCase()}
-                    </span>
-                  </div>
-                  {shopifyOrders[0].line_items_summary && (
-                    <div className="space-y-1.5 mb-3">
-                      {(shopifyOrders[0].line_items_summary as Array<{ title: string; qty: number }>).map((item, i) => (
-                        <div key={i} className="flex justify-between text-xs">
-                          <span className="text-[var(--text-secondary)]">{item.title} x{item.qty}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)]">
-                    <span className="text-xs font-mono text-[var(--text-primary)]">
-                      ${shopifyOrders[0].total_price || "0.00"}
-                    </span>
-                    <button className="text-[10px] font-medium text-[var(--aiva-blue)] hover:underline flex items-center gap-1">
-                      Insert Tracking into Draft <ChevronDown size={10} />
-                    </button>
-                  </div>
-                </div>
+                <AIResponseRenderer response={aiResponse} />
               </motion.div>
             )}
           </div>
@@ -258,7 +262,15 @@ export default function ConversationPage() {
         </div>
 
         {/* CRM Panel */}
-        <div className="hidden xl:flex w-[300px] border-l border-[var(--border-subtle)] bg-[var(--background-elevated)] flex-col overflow-y-auto">
+        <div className={`${mobileCrmOpen ? "fixed inset-0 z-50 bg-[var(--background-elevated)]" : "hidden"} xl:relative xl:flex w-full xl:w-[300px] border-l border-[var(--border-subtle)] bg-[var(--background-elevated)] flex-col overflow-y-auto`}>
+          {mobileCrmOpen && (
+            <div className="xl:hidden flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
+              <span className="text-sm font-medium text-[var(--text-primary)]">Customer Details</span>
+              <button onClick={() => setMobileCrmOpen(false)} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">
+                <X size={16} />
+              </button>
+            </div>
+          )}
           <div className="p-4 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-3 mb-3">
               <Avatar

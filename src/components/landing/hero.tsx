@@ -46,7 +46,7 @@ export function Hero() {
         {/* Subtext */}
         <motion.p
           variants={staggerItem}
-          className="text-lg text-[var(--text-secondary)] max-w-2xl mx-auto mb-10 leading-relaxed"
+          className="text-base sm:text-lg text-[var(--text-secondary)] max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed px-2 sm:px-0"
         >
           Connect Gmail, Slack, and Shopify. AIVA prioritizes what matters, drafts
           replies in your tone, and auto-sends the routine — so nothing important
@@ -54,7 +54,7 @@ export function Hero() {
         </motion.p>
 
         {/* CTAs */}
-        <motion.div variants={staggerItem} className="flex items-center justify-center gap-4">
+        <motion.div variants={staggerItem} className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
           <Button variant="secondary" size="xl" className="group" asChild>
             <Link href="/auth/register">
               Start Free
