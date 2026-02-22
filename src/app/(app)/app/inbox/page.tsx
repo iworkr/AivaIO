@@ -2,25 +2,34 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { EmptyState, LottieAnimation } from "@/components/ui";
 import { EmptyStateHook } from "@/components/app/empty-state-hook";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { fetchThreads, subscribeToMessages } from "@/lib/supabase/queries";
 import { useAuth } from "@/hooks/use-auth";
 import { useIntegrations } from "@/hooks/use-integrations";
+import { createClient } from "@/lib/supabase/client";
+import { GmailIcon, SlackIcon, ShopifyIcon } from "@/components/icons/brand-icons";
 import {
-  Mail, Hash, Phone, ShoppingBag, Sparkles,
-  Archive, CheckCheck, RefreshCw,
+  Mail, Sparkles, Archive, Check, CheckCheck, RefreshCw, X,
 } from "lucide-react";
 import type { Priority, MessageProvider, Thread } from "@/types";
 
-const providerIcons: Record<MessageProvider, React.ReactNode> = {
-  GMAIL: <Mail size={14} />,
-  SLACK: <Hash size={14} />,
-  WHATSAPP: <Phone size={14} />,
-  SHOPIFY: <ShoppingBag size={14} />,
-};
+function InboxProviderIcon({ provider, isHovered }: { provider: MessageProvider; isHovered: boolean }) {
+  const size = 16;
+  const className = `shrink-0 transition-all duration-200 ${isHovered ? "grayscale-0 opacity-100" : "grayscale opacity-60"}`;
+  switch (provider) {
+    case "GMAIL":
+      return <GmailIcon size={size} className={className} />;
+    case "SLACK":
+      return <SlackIcon size={size} className={className} />;
+    case "SHOPIFY":
+      return <ShopifyIcon size={size} className={className} />;
+    default:
+      return <Mail size={14} className={className} />;
+  }
+}
 
 const priorityAccent: Record<Priority, string | null> = {
   URGENT: "text-[var(--status-error)]",
@@ -64,15 +73,65 @@ function SkeletonRows({ count = 8 }: { count?: number }) {
 export default function InboxPage() {
   const [activeFilter, setActiveFilter] = useState<string>("All");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [actionLoading, setActionLoading] = useState(false);
   const { user } = useAuth();
   const { hasAnyConnection } = useIntegrations();
   const router = useRouter();
   const hasSynced = useRef(false);
+
+  const toggleSelect = useCallback((threadId: string, index: number, shiftKey: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (shiftKey && lastClickedIndex !== null) {
+        const lo = Math.min(lastClickedIndex, index);
+        const hi = Math.max(lastClickedIndex, index);
+        for (let i = lo; i <= hi; i++) {
+          const id = threads[i]?.id;
+          if (id) next.add(id);
+        }
+      } else {
+        if (next.has(threadId)) next.delete(threadId);
+        else next.add(threadId);
+      }
+      return next;
+    });
+    setLastClickedIndex(index);
+  }, [lastClickedIndex, threads]);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  const handleBulkArchive = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setActionLoading(true);
+    try {
+      const supabase = createClient();
+      await supabase.from("threads").update({ is_archived: true }).in("id", Array.from(selectedIds));
+      setSelectedIds(new Set());
+      await loadThreads();
+    } catch { /* ignore */ } finally {
+      setActionLoading(false);
+    }
+  }, [selectedIds, loadThreads]);
+
+  const handleBulkMarkRead = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    setActionLoading(true);
+    try {
+      const supabase = createClient();
+      await supabase.from("threads").update({ is_unread: false }).in("id", Array.from(selectedIds));
+      setSelectedIds(new Set());
+      await loadThreads();
+    } catch { /* ignore */ } finally {
+      setActionLoading(false);
+    }
+  }, [selectedIds, loadThreads]);
 
   const triggerSync = useCallback(async () => {
     if (isSyncing) return;
@@ -211,6 +270,8 @@ export default function InboxPage() {
               const accent = priorityAccent[thread.priority];
               const isHovered = hoveredId === thread.id;
               const isSelected = selectedId === thread.id;
+              const isChecked = selectedIds.has(thread.id);
+              const showCheckbox = isHovered || selectedIds.size > 0;
 
               return (
                 <motion.div
@@ -218,7 +279,14 @@ export default function InboxPage() {
                   variants={staggerItem}
                   onMouseEnter={() => setHoveredId(thread.id)}
                   onMouseLeave={() => setHoveredId(null)}
-                  onClick={() => {
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.closest("[data-inbox-checkbox]")) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleSelect(thread.id, index, e.shiftKey);
+                      return;
+                    }
                     setSelectedId(thread.id);
                     setSelectedIndex(index);
                     router.push(`/app/inbox/${thread.id}`);
@@ -228,13 +296,31 @@ export default function InboxPage() {
                     isSelected
                       ? "bg-[var(--surface-active)]"
                       : "hover:bg-[var(--surface-hover)]"
-                  }`}
+                  } ${isChecked ? "bg-[rgba(59,130,246,0.06)]" : ""}`}
                 >
-                  {/* Col 1: Channel icon — 32px */}
-                  <span className={`w-8 shrink-0 flex items-center justify-center transition-opacity duration-150 ${
-                    isHovered ? "opacity-100" : "opacity-40"
-                  } text-[var(--text-tertiary)]`}>
-                    {providerIcons[thread.provider] || <Mail size={14} />}
+                  {/* Col 0: Checkbox — 28px */}
+                  <div
+                    data-inbox-checkbox
+                    className="w-7 shrink-0 flex items-center justify-center"
+                  >
+                    {showCheckbox ? (
+                      <div
+                        className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
+                          isChecked
+                            ? "bg-[var(--aiva-blue)] border-[var(--aiva-blue)]"
+                            : "border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)]"
+                        }`}
+                      >
+                        {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+                      </div>
+                    ) : (
+                      <span className="w-4" />
+                    )}
+                  </div>
+
+                  {/* Col 1: Branded channel icon — 32px */}
+                  <span className="w-8 shrink-0 flex items-center justify-center text-[var(--text-tertiary)]">
+                    <InboxProviderIcon provider={thread.provider} isHovered={isHovered} />
                   </span>
 
                   {/* Col 2: Sender — 160px fixed */}
@@ -302,6 +388,47 @@ export default function InboxPage() {
           </motion.div>
         )}
       </div>
+
+      {/* Floating action island when emails are selected */}
+      <AnimatePresence>
+        {selectedIds.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl bg-[#0A0A0A] border border-[rgba(255,255,255,0.12)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+          >
+            <span className="text-sm font-medium text-[var(--text-primary)] mr-2 min-w-[80px]">
+              {selectedIds.size} selected
+            </span>
+            <button
+              onClick={handleBulkMarkRead}
+              disabled={actionLoading}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors disabled:opacity-50"
+            >
+              <CheckCheck size={16} />
+              Mark read
+            </button>
+            <button
+              onClick={handleBulkArchive}
+              disabled={actionLoading}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors disabled:opacity-50"
+            >
+              <Archive size={16} />
+              Archive
+            </button>
+            <div className="w-px h-6 bg-[rgba(255,255,255,0.08)]" />
+            <button
+              onClick={clearSelection}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+            >
+              <X size={16} />
+              Clear
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
