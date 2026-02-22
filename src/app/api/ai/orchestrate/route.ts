@@ -1,132 +1,39 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { callLLM } from "@/lib/ai/llm-client";
+import type { ChatMessage } from "@/lib/ai/llm-client";
+import { TOOL_DEFINITIONS, executeToolCall } from "@/lib/ai/tools";
 import type { AIResponse } from "@/types";
 
-async function fetchInboxContext(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: threads } = await supabase
-    .from("threads")
-    .select(`
-      id, primary_subject, provider, last_message_at, message_count,
-      is_unread, priority, snippet, has_draft, confidence_score,
-      contacts:contact_id (full_name, email)
-    `)
-    .eq("is_archived", false)
-    .order("last_message_at", { ascending: false })
-    .limit(25);
+const MAX_TOOL_ITERATIONS = 5;
+const MAX_HISTORY_MESSAGES = 30;
 
-  if (!threads || threads.length === 0) return { summary: "The user's inbox is empty.", threads: [] };
-
-  const unread = threads.filter((t: Record<string, unknown>) => t.is_unread);
-  const urgent = threads.filter((t: Record<string, unknown>) => t.priority === "urgent" || t.priority === "high");
-  const withDrafts = threads.filter((t: Record<string, unknown>) => t.has_draft);
-
-  const threadLines = threads.slice(0, 20).map((t: Record<string, unknown>, i: number) => {
-    const contact = t.contacts as Record<string, string> | null;
-    const sender = contact?.full_name || contact?.email || "Unknown";
-    const subject = (t.primary_subject as string) || "(no subject)";
-    const snippet = (t.snippet as string)?.slice(0, 120) || "";
-    const priority = (t.priority as string) || "medium";
-    const unreadTag = t.is_unread ? "[UNREAD]" : "[READ]";
-    const draftTag = t.has_draft ? "[HAS DRAFT]" : "";
-    const time = t.last_message_at as string;
-    return `${i + 1}. ${unreadTag}${draftTag} From: ${sender} | Subject: "${subject}" | Priority: ${priority} | Time: ${time}\n   Snippet: ${snippet}`;
+function buildSystemPrompt(userEmail: string, userName: string, timezone: string): string {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-US", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+    timeZone: timezone,
+  });
+  const timeStr = now.toLocaleTimeString("en-US", {
+    hour: "2-digit", minute: "2-digit",
+    timeZone: timezone,
   });
 
-  const summary = [
-    `Total threads: ${threads.length}`,
-    `Unread: ${unread.length}`,
-    `Urgent/High priority: ${urgent.length}`,
-    `With pending drafts: ${withDrafts.length}`,
-  ].join(", ");
+  return `You are AIVA, an elite AI executive assistant. You actively query the user's data using tools — never guess or fabricate information.
 
-  return { summary, threadLines, threads };
-}
+═══ ENVIRONMENT ═══
+CURRENT DATETIME: ${dateStr}, ${timeStr} (${timezone})
+USER: ${userName} (${userEmail})
 
-async function fetchRecentMessages(supabase: Awaited<ReturnType<typeof createClient>>, threadIds: string[]) {
-  if (threadIds.length === 0) return [];
-  const { data } = await supabase
-    .from("messages")
-    .select("id, thread_id, sender_name, sender_email, subject, body, snippet, timestamp, priority")
-    .in("thread_id", threadIds)
-    .order("timestamp", { ascending: false })
-    .limit(30);
-  return data || [];
-}
-
-export async function POST(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { query } = await request.json();
-
-  if (!query) {
-    return NextResponse.json({ error: "Missing query" }, { status: 400 });
-  }
-
-  const inbox = await fetchInboxContext(supabase);
-
-  const topThreadIds = (inbox.threads || []).slice(0, 8).map((t: Record<string, unknown>) => t.id as string);
-  const recentMessages = await fetchRecentMessages(supabase, topThreadIds);
-
-  const messageContext = recentMessages.length > 0
-    ? recentMessages.slice(0, 15).map((m) => {
-        const body = ((m.body as string) || (m.snippet as string) || "").slice(0, 200);
-        return `- From: ${m.sender_name || m.sender_email} | Subject: ${m.subject || "(none)"} | ${m.timestamp}\n  "${body}"`;
-      }).join("\n")
-    : "No recent messages available.";
-
-  const { data: shopifyOrders } = await supabase
-    .from("shopify_orders")
-    .select("id, order_name, customer_name, customer_email, financial_status, fulfillment_status, total_price, currency, tracking_number, tracking_url")
-    .order("created_at", { ascending: false })
-    .limit(5);
-
-  const shopifyContext = shopifyOrders && shopifyOrders.length > 0
-    ? shopifyOrders.map((o) =>
-        `- Order ${o.order_name}: ${o.customer_name} (${o.customer_email}) — ${o.financial_status}/${o.fulfillment_status} — ${o.total_price} ${o.currency}${o.tracking_number ? ` — Tracking: ${o.tracking_number}` : ""}`
-      ).join("\n")
-    : "No Shopify orders.";
-
-  const threadDataForWidgets = (inbox.threads || []).slice(0, 8).map((t: Record<string, unknown>) => {
-    const contact = t.contacts as Record<string, string> | null;
-    return {
-      id: t.id as string,
-      sender: contact?.full_name || contact?.email || "Unknown",
-      senderEmail: contact?.email || "",
-      subject: (t.primary_subject as string) || "(no subject)",
-      snippet: (t.snippet as string)?.slice(0, 120) || "",
-      timestamp: t.last_message_at as string,
-      priority: (t.priority as string) || "medium",
-      provider: ((t.provider as string) || "gmail").toLowerCase(),
-      isUnread: t.is_unread as boolean,
-    };
-  });
-
-  const systemPrompt = `You are AIVA, an elite AI executive assistant. You have access to the user's REAL inbox data and integrations.
-Answer based ONLY on the data provided below. Do NOT make up emails or data that isn't in the context.
-
-═══ INBOX OVERVIEW ═══
-${inbox.summary}
-
-═══ THREADS (most recent first) ═══
-${inbox.threadLines?.join("\n") || "No threads."}
-
-═══ RECENT MESSAGES ═══
-${messageContext}
-
-═══ SHOPIFY ORDERS ═══
-${shopifyContext}
-
-═══ AVAILABLE THREAD DATA FOR WIDGETS ═══
-${JSON.stringify(threadDataForWidgets, null, 2)}
+═══ BEHAVIORAL RULES ═══
+- ALWAYS use your tools to fetch real data before answering. Never fabricate emails, orders, or contacts.
+- When the user says "today", use date ${now.toISOString().split("T")[0]}.
+- When the user says "this week", calculate the date range from the most recent Monday.
+- Maintain awareness of the full conversation history. If the user follows up with "now filter those" or "show me just the ones from Google", refer to the context of prior turns — do NOT ask the user to repeat themselves.
+- If a follow-up is ambiguous, make a reasonable inference from the conversation history. Only ask for clarification if truly necessary.
 
 ═══ RESPONSE FORMAT ═══
-Respond in JSON:
+After gathering data via tools, respond in JSON:
 {
   "textSummary": "Brief conversational markdown text.",
   "widgets": [],
@@ -135,28 +42,19 @@ Respond in JSON:
 
 ═══ CRITICAL: MUTUAL EXCLUSION RULE ═══
 When you include EMAIL_SUMMARY_CARD widgets, your textSummary must ONLY be a brief 1-2 sentence introduction.
-DO NOT list, enumerate, or describe the individual emails in the textSummary when widgets are present.
-The cards handle the data display — the text just sets the stage.
+DO NOT list, enumerate, or describe the individual emails in textSummary when widgets are present.
 
-BAD (redundant): "You have 25 emails. Here are the top ones: - From Google: Security alert... - From Airbnb: Write a review..."
-GOOD (concise): "You have **25 unread emails** today. I've highlighted the 3 most important ones below."
+BAD: "You have 25 emails. Here are the top ones: - From Google: Security alert..."
+GOOD: "You have **25 unread emails** today. I've highlighted the 3 most important ones below."
 
 ═══ FORMATTING RULES ═══
-1. textSummary MUST be valid Markdown:
-   - **bold** for key figures and emphasis
-   - Keep it to 1-2 short sentences when widgets are attached
-   - Only use bullet lists when NO widgets are present and you need to describe items in prose
-   - Do NOT prefix data with labels like "From:", "Subject:", "Snippet:" — just write naturally
-
-2. CITATIONS: Only include when there are NO widgets. Use tiny inline references.
-   Format: { "id": "cite_1", "source": "gmail", "snippet": "Subject line" }
-   When widgets ARE present, set citations to an empty array [].
-
-3. EMAIL_SUMMARY_CARD WIDGETS: When the user asks to summarize, list, or review emails, include the top 3 most relevant as widgets:
+1. textSummary MUST be valid Markdown. Use **bold** for key figures. Keep it concise when widgets are attached.
+2. CITATIONS: Only include when there are NO widgets. When widgets ARE present, set citations to [].
+3. EMAIL_SUMMARY_CARD WIDGETS: When the user asks to summarize/list/filter emails, include the top 3 most relevant:
    {
      "type": "EMAIL_SUMMARY_CARD",
      "data": {
-       "threadId": "<id from AVAILABLE THREAD DATA>",
+       "threadId": "<actual thread ID from tool results>",
        "sender": "<sender name>",
        "senderEmail": "<sender email>",
        "subject": "<subject line>",
@@ -167,33 +65,225 @@ GOOD (concise): "You have **25 unread emails** today. I've highlighted the 3 mos
        "isUnread": true | false
      }
    }
-   ONLY use data from AVAILABLE THREAD DATA — do NOT fabricate.
+   ONLY use data from tool results — do NOT fabricate.
+4. SHOPIFY_CARD: For Shopify order queries.
+5. ACTION_CARD: For action suggestions.
+6. If tools return empty results, say so directly with no widgets.`;
+}
 
-4. SHOPIFY_CARD: Only for Shopify order queries when data exists.
-5. ACTION_CARD: For suggestions/actions.
-6. If inbox is empty, say so directly with no widgets.`;
+async function loadChatHistory(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string
+): Promise<ChatMessage[]> {
+  const { data } = await supabase
+    .from("chat_messages")
+    .select("role, content, tool_calls, tool_results")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: true })
+    .limit(MAX_HISTORY_MESSAGES);
 
-  const response = await callLLM([
-    { role: "system", content: systemPrompt },
-    { role: "user", content: query },
-  ], {
-    temperature: 0.3,
-    maxTokens: 2000,
-    responseFormat: "json_object",
+  if (!data || data.length === 0) return [];
+
+  const messages: ChatMessage[] = [];
+  for (const row of data) {
+    if (row.role === "tool" && row.tool_results) {
+      const results = row.tool_results as Array<{ tool_call_id: string; name: string; content: string }>;
+      for (const r of results) {
+        messages.push({ role: "tool", content: r.content, tool_call_id: r.tool_call_id, name: r.name });
+      }
+    } else if (row.role === "assistant" && row.tool_calls) {
+      messages.push({
+        role: "assistant",
+        content: row.content,
+        tool_calls: row.tool_calls as ChatMessage["tool_calls"],
+      });
+    } else {
+      messages.push({ role: row.role as ChatMessage["role"], content: row.content || "" });
+    }
+  }
+
+  return messages;
+}
+
+async function saveChatMessage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+  role: string,
+  content: string | null,
+  toolCalls?: unknown,
+  toolResults?: unknown,
+  widgets?: unknown
+) {
+  await supabase.from("chat_messages").insert({
+    session_id: sessionId,
+    role,
+    content,
+    tool_calls: toolCalls || null,
+    tool_results: toolResults || null,
+    widgets: widgets || null,
   });
+
+  await supabase
+    .from("chat_sessions")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", sessionId);
+}
+
+export async function POST(request: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const { query, sessionId: requestSessionId, timezone = "Australia/Sydney" } = body;
+
+  if (!query) {
+    return NextResponse.json({ error: "Missing query" }, { status: 400 });
+  }
+
+  let sessionId = requestSessionId;
+  if (!sessionId) {
+    const { data: newSession, error: sessionError } = await supabase
+      .from("chat_sessions")
+      .insert({ user_id: user.id, title: null })
+      .select("id")
+      .single();
+
+    if (sessionError || !newSession) {
+      return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
+    }
+    sessionId = newSession.id;
+  }
+
+  await saveChatMessage(supabase, sessionId, "user", query);
+
+  const history = await loadChatHistory(supabase, sessionId);
+
+  const userName =
+    (user.user_metadata?.full_name as string) ||
+    user.email?.split("@")[0] ||
+    "User";
+  const userEmail = user.email || "";
+
+  const systemPrompt = buildSystemPrompt(userEmail, userName, timezone);
+
+  const llmMessages: ChatMessage[] = [
+    { role: "system", content: systemPrompt },
+    ...history,
+  ];
+
+  let iterations = 0;
+  let finalContent: string | null = null;
+  const allToolCalls: Array<{ name: string; args: Record<string, unknown>; result: string }> = [];
+
+  while (iterations < MAX_TOOL_ITERATIONS) {
+    iterations++;
+
+    const response = await callLLM(llmMessages, {
+      temperature: 0.3,
+      maxTokens: 2000,
+      tools: TOOL_DEFINITIONS,
+    });
+
+    if (response.tool_calls && response.tool_calls.length > 0) {
+      llmMessages.push({
+        role: "assistant",
+        content: response.content,
+        tool_calls: response.tool_calls,
+      });
+
+      const toolResultMessages: Array<{ tool_call_id: string; name: string; content: string }> = [];
+
+      for (const toolCall of response.tool_calls) {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(toolCall.function.arguments);
+        } catch { /* empty args */ }
+
+        const result = await executeToolCall(supabase, toolCall.function.name, args);
+        allToolCalls.push({ name: toolCall.function.name, args, result });
+
+        const toolMsg: ChatMessage = {
+          role: "tool",
+          content: result,
+          tool_call_id: toolCall.id,
+          name: toolCall.function.name,
+        };
+        llmMessages.push(toolMsg);
+        toolResultMessages.push({
+          tool_call_id: toolCall.id,
+          name: toolCall.function.name,
+          content: result,
+        });
+      }
+
+      await saveChatMessage(
+        supabase, sessionId, "assistant", response.content,
+        response.tool_calls
+      );
+      await saveChatMessage(
+        supabase, sessionId, "tool", null,
+        null, toolResultMessages
+      );
+
+      continue;
+    }
+
+    finalContent = response.content;
+    break;
+  }
+
+  if (!finalContent) {
+    finalContent = JSON.stringify({
+      textSummary: "I ran into a problem processing that request. Could you try again?",
+      widgets: [],
+      citations: [],
+    });
+  }
 
   let aiResponse: AIResponse;
   try {
-    aiResponse = JSON.parse(response.content);
+    aiResponse = JSON.parse(finalContent);
     if (!aiResponse.widgets) aiResponse.widgets = [];
     if (!aiResponse.citations) aiResponse.citations = [];
+    if (!aiResponse.textSummary && typeof finalContent === "string") {
+      aiResponse.textSummary = finalContent;
+    }
   } catch {
     aiResponse = {
-      textSummary: response.content,
+      textSummary: finalContent,
       widgets: [],
       citations: [],
     };
   }
 
-  return NextResponse.json(aiResponse);
+  await saveChatMessage(
+    supabase, sessionId, "assistant", finalContent,
+    null, null, aiResponse.widgets.length > 0 ? aiResponse.widgets : null
+  );
+
+  if (!requestSessionId) {
+    const titlePrompt = `Based on the following user query, generate a very short title (3-5 words max) for this chat session. Reply with just the title, nothing else.\n\nQuery: "${query}"`;
+    try {
+      const titleResponse = await callLLM([
+        { role: "user", content: titlePrompt },
+      ], { temperature: 0.5, maxTokens: 20 });
+      if (titleResponse.content) {
+        const title = titleResponse.content.replace(/^["']|["']$/g, "").trim();
+        await supabase
+          .from("chat_sessions")
+          .update({ title })
+          .eq("id", sessionId);
+      }
+    } catch { /* non-critical */ }
+  }
+
+  return NextResponse.json({
+    ...aiResponse,
+    sessionId,
+    toolsUsed: allToolCalls.map((t) => t.name),
+  });
 }

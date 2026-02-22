@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Hash, Phone, ShoppingBag, Calendar } from "lucide-react";
+import { Mail, Hash, Phone, ShoppingBag, Calendar, Search, Database } from "lucide-react";
 
 interface ResearchingStateProps {
   integrations?: string[];
+  toolsActive?: string[];
   onComplete?: () => void;
 }
 
@@ -15,49 +16,59 @@ const integrationConfig: Record<string, { icon: React.ElementType; label: string
   whatsapp: { icon: Phone, label: "WhatsApp", color: "#25D366" },
   shopify: { icon: ShoppingBag, label: "Shopify", color: "#96BF48" },
   calendar: { icon: Calendar, label: "Calendar", color: "#4285F4" },
+  search_inbox: { icon: Search, label: "Inbox", color: "#3B82F6" },
+  get_shopify_orders: { icon: ShoppingBag, label: "Shopify", color: "#96BF48" },
+  get_contact_info: { icon: Database, label: "CRM", color: "#8B5CF6" },
+  get_thread_detail: { icon: Mail, label: "Thread", color: "#EA4335" },
 };
 
-const phases = [
-  { label: "> parsing_intent...", duration: 300 },
-  { label: "> querying integrations...", duration: 2200 },
-  { label: "> synthesizing_response...", duration: 500 },
+const THINKING_PHRASES = [
+  "> parsing_intent...",
+  "> querying integrations...",
+  "> scanning_inbox...",
+  "> synthesizing_response...",
 ];
 
-export function ResearchingState({ integrations = ["gmail", "slack", "shopify"], onComplete }: ResearchingStateProps) {
+export function ResearchingState({ integrations = ["gmail"], toolsActive, onComplete }: ResearchingStateProps) {
   const [phase, setPhase] = useState(0);
   const [activeIntegrations, setActiveIntegrations] = useState<Set<string>>(new Set());
-  const [microCopy, setMicroCopy] = useState(phases[0].label);
+  const [microCopy, setMicroCopy] = useState(THINKING_PHRASES[0]);
+
+  const displayIntegrations = toolsActive && toolsActive.length > 0
+    ? toolsActive
+    : integrations;
 
   useEffect(() => {
     let timeout: NodeJS.Timeout;
 
     if (phase === 0) {
-      setMicroCopy(phases[0].label);
-      timeout = setTimeout(() => setPhase(1), phases[0].duration);
+      setMicroCopy(THINKING_PHRASES[0]);
+      timeout = setTimeout(() => setPhase(1), 400);
     } else if (phase === 1) {
-      integrations.forEach((int, i) => {
+      displayIntegrations.forEach((int, i) => {
         setTimeout(() => {
           setActiveIntegrations((prev) => new Set([...prev, int]));
-          setMicroCopy(`> querying: ${int} (scanning recent data...)`);
-        }, i * 600);
+          const config = integrationConfig[int];
+          const label = config?.label || int;
+          setMicroCopy(`> querying: ${label.toLowerCase()} (scanning recent data...)`);
+        }, i * 500);
       });
-      timeout = setTimeout(() => setPhase(2), phases[1].duration);
+      timeout = setTimeout(() => setPhase(2), Math.max(1500, displayIntegrations.length * 600));
     } else if (phase === 2) {
-      setMicroCopy(phases[2].label);
+      setMicroCopy(THINKING_PHRASES[3]);
       timeout = setTimeout(() => {
         setPhase(3);
         onComplete?.();
-      }, phases[2].duration);
+      }, 600);
     }
 
     return () => clearTimeout(timeout);
-  }, [phase, integrations, onComplete]);
+  }, [phase, displayIntegrations, onComplete]);
 
   if (phase === 3) return null;
 
   return (
-    <div className="flex flex-col items-center gap-4 py-8">
-      {/* Progress bar */}
+    <div className="flex flex-col gap-3 py-2">
       <div className="w-full max-w-xs h-[1px] bg-[var(--border-subtle)] overflow-hidden rounded-full">
         <motion.div
           className="h-full bg-[var(--aiva-blue)]"
@@ -67,16 +78,15 @@ export function ResearchingState({ integrations = ["gmail", "slack", "shopify"],
         />
       </div>
 
-      {/* Integration logos */}
       <AnimatePresence>
         {phase === 1 && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="flex items-center gap-4"
+            exit={{ opacity: 0, y: -6 }}
+            className="flex items-center gap-3"
           >
-            {integrations.map((int) => {
+            {displayIntegrations.map((int) => {
               const config = integrationConfig[int];
               if (!config) return null;
               const Icon = config.icon;
@@ -86,13 +96,16 @@ export function ResearchingState({ integrations = ["gmail", "slack", "shopify"],
                   key={int}
                   animate={{ opacity: isActive ? 1 : 0.3 }}
                   transition={{ duration: 0.2 }}
-                  className="flex flex-col items-center gap-1"
+                  className="flex items-center gap-1.5"
                 >
                   <Icon
-                    size={24}
+                    size={14}
                     style={{ color: isActive ? config.color : "var(--text-tertiary)" }}
                     className="transition-colors duration-200"
                   />
+                  <span className="text-[11px] font-mono" style={{ color: isActive ? config.color : "var(--text-tertiary)" }}>
+                    {config.label}
+                  </span>
                 </motion.div>
               );
             })}
@@ -100,11 +113,10 @@ export function ResearchingState({ integrations = ["gmail", "slack", "shopify"],
         )}
       </AnimatePresence>
 
-      {/* Micro-copy */}
       <motion.p
         key={microCopy}
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        animate={{ opacity: 0.7 }}
         className="text-[11px] font-mono text-[var(--text-secondary)]"
       >
         {microCopy}

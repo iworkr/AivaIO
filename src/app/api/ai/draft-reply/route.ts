@@ -82,7 +82,7 @@ export async function POST(request: Request) {
   ], { temperature: 0.7, maxTokens: 500 });
 
   return NextResponse.json({
-    draft: response.content,
+    draft: response.content || "",
     confidenceScore: 0.85,
     toneApplied: toneProfile,
   });

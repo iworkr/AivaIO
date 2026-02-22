@@ -21,6 +21,7 @@ interface ChatMessage {
   text: string;
   widgets?: AIResponse["widgets"];
   citations?: AIResponse["citations"];
+  toolsUsed?: string[];
 }
 
 const PLACEHOLDERS = [
@@ -271,6 +272,7 @@ export default function DashboardPage() {
   const [isThinking, setIsThinking] = useState(false);
   const [placeholderIdx, setPlaceholderIdx] = useState(0);
   const [showSlash, setShowSlash] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const feedEndRef = useRef<HTMLDivElement>(null);
 
@@ -304,6 +306,7 @@ export default function DashboardPage() {
       setMessages([]);
       setChatActive(false);
       setInputValue("");
+      setSessionId(null);
       return;
     }
 
@@ -311,6 +314,7 @@ export default function DashboardPage() {
       setMessages([]);
       setChatActive(false);
       setInputValue("");
+      setSessionId(null);
       return;
     }
 
@@ -330,9 +334,17 @@ export default function DashboardPage() {
       const res = await fetch("/api/ai/orchestrate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: userMsg.text }),
+        body: JSON.stringify({
+          query: userMsg.text,
+          sessionId,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        }),
       });
       const data: AIResponse = await res.json();
+
+      if (data.sessionId && !sessionId) {
+        setSessionId(data.sessionId);
+      }
 
       const assistantMsg: ChatMessage = {
         id: `a-${Date.now()}`,
@@ -340,6 +352,7 @@ export default function DashboardPage() {
         text: data.textSummary || "",
         widgets: data.widgets,
         citations: data.citations,
+        toolsUsed: data.toolsUsed,
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch {
@@ -350,7 +363,7 @@ export default function DashboardPage() {
     } finally {
       setIsThinking(false);
     }
-  }, [isThinking]);
+  }, [isThinking, sessionId]);
 
   const handleSubmit = () => {
     if (inputValue.trim()) sendMessage(inputValue);
@@ -493,6 +506,13 @@ export default function DashboardPage() {
                       </p>
                     ) : (
                       <>
+                        {msg.toolsUsed && msg.toolsUsed.length > 0 && (
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-mono text-[var(--text-tertiary)]">
+                              Used: {msg.toolsUsed.join(", ")}
+                            </span>
+                          </div>
+                        )}
                         {msg.text && (
                           <div className="aiva-prose">
                             <ReactMarkdown
@@ -531,7 +551,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="flex-1 min-w-0 pt-1">
-                    <ResearchingState integrations={["gmail", "slack", "shopify"]} />
+                    <ResearchingState integrations={["gmail"]} />
                   </div>
                 </motion.div>
               )}

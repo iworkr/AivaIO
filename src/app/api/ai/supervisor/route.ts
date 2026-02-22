@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
   let result: SupervisorResult;
   try {
-    result = JSON.parse(response.content);
+    result = JSON.parse(response.content || "{}");
   } catch {
     result = {
       confidenceScore: 0,

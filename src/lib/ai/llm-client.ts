@@ -1,13 +1,36 @@
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL || "https://api.openai.com/v1";
 
-interface ChatMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
+export interface ChatMessage {
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+  name?: string;
 }
 
-interface LLMResponse {
-  content: string;
+export interface ToolCall {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+interface ToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
+export interface LLMResponse {
+  content: string | null;
+  tool_calls?: ToolCall[];
+  finish_reason?: string;
   usage?: { prompt_tokens: number; completion_tokens: number };
 }
 
@@ -18,6 +41,7 @@ export async function callLLM(
     temperature?: number;
     maxTokens?: number;
     responseFormat?: "text" | "json_object";
+    tools?: ToolDefinition[];
   } = {}
 ): Promise<LLMResponse> {
   const {
@@ -25,6 +49,7 @@ export async function callLLM(
     temperature = 0.7,
     maxTokens = 1024,
     responseFormat = "text",
+    tools,
   } = options;
 
   if (!OPENAI_API_KEY) {
@@ -43,6 +68,11 @@ export async function callLLM(
     body.response_format = { type: "json_object" };
   }
 
+  if (tools && tools.length > 0) {
+    body.tools = tools;
+    body.tool_choice = "auto";
+  }
+
   const res = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {
@@ -58,8 +88,12 @@ export async function callLLM(
   }
 
   const data = await res.json();
+  const choice = data.choices?.[0];
+
   return {
-    content: data.choices?.[0]?.message?.content || "",
+    content: choice?.message?.content || null,
+    tool_calls: choice?.message?.tool_calls,
+    finish_reason: choice?.finish_reason,
     usage: data.usage,
   };
 }

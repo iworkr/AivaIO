@@ -76,6 +76,8 @@ export interface AIResponse {
     source: "gmail" | "slack" | "whatsapp" | "shopify";
     snippet: string;
   }>;
+  sessionId?: string;
+  toolsUsed?: string[];
 }
 
 /* Message types */
