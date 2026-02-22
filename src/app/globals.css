@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+/* ============================================
+   AIVA.io Design Token System
+   Linear Aesthetic Edition
+   ============================================ */
+
+/* Dark theme (default) */
+:root {
+  --background-main: #000000;
+  --background-elevated: #0A0A0A;
+  --background-sidebar: #050505;
+
+  --text-primary: #F4F4F5;
+  --text-secondary: #A1A1AA;
+  --text-tertiary: #52525B;
+
+  --aiva-blue: #3B82F6;
+  --aiva-blue-glow: rgba(59, 130, 246, 0.15);
+  --aiva-blue-ring: rgba(59, 130, 246, 0.5);
+  --aiva-blue-border: rgba(59, 130, 246, 0.3);
+
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-glow: rgba(255, 255, 255, 0.15);
+  --border-hover: rgba(255, 255, 255, 0.12);
+
+  --surface-hover: rgba(255, 255, 255, 0.03);
+  --surface-active: rgba(255, 255, 255, 0.06);
+
+  --status-success: #4ADE80;
+  --status-success-bg: rgba(34, 197, 94, 0.1);
+  --status-warning: #FBBF24;
+  --status-warning-bg: rgba(251, 191, 36, 0.1);
+  --status-error: #F87171;
+  --status-error-bg: rgba(239, 68, 68, 0.1);
+}
+
+/* Light theme */
+.light {
+  --background-main: #FFFFFF;
+  --background-elevated: #F9FAFB;
+  --background-sidebar: #F3F4F6;
+
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+
+  --aiva-blue: #2563EB;
+  --aiva-blue-glow: rgba(37, 99, 235, 0.1);
+  --aiva-blue-ring: rgba(37, 99, 235, 0.4);
+  --aiva-blue-border: rgba(37, 99, 235, 0.25);
+
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-glow: rgba(0, 0, 0, 0.15);
+  --border-hover: rgba(0, 0, 0, 0.12);
+
+  --surface-hover: rgba(0, 0, 0, 0.03);
+  --surface-active: rgba(0, 0, 0, 0.06);
+
+  --status-success: #16A34A;
+  --status-success-bg: rgba(22, 163, 74, 0.1);
+  --status-warning: #D97706;
+  --status-warning-bg: rgba(217, 119, 6, 0.1);
+  --status-error: #DC2626;
+  --status-error-bg: rgba(220, 38, 38, 0.1);
+}
+
+@theme inline {
+  /* Backgrounds */
+  --color-background: var(--background-main);
+  --color-elevated: var(--background-elevated);
+  --color-sidebar: var(--background-sidebar);
+
+  /* Text */
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-tertiary: var(--text-tertiary);
+
+  /* Accent */
+  --color-aiva-blue: var(--aiva-blue);
+  --color-aiva-blue-glow: var(--aiva-blue-glow);
+
+  /* Borders */
+  --color-border-subtle: var(--border-subtle);
+  --color-border-glow: var(--border-glow);
+
+  /* Surfaces */
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+
+  /* Status */
+  --color-success: var(--status-success);
+  --color-success-bg: var(--status-success-bg);
+  --color-warning: var(--status-warning);
+  --color-warning-bg: var(--status-warning-bg);
+  --color-error: var(--status-error);
+  --color-error-bg: var(--status-error-bg);
+
+  /* Fonts */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+
+  /* Easing */
+  --ease-linear-smooth: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Base styles */
+body {
+  background: var(--background-main);
+  color: var(--text-primary);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Theme transition */
+*,
+*::before,
+*::after {
+  transition-property: background-color, border-color, color;
+  transition-duration: 300ms;
+  transition-timing-function: ease;
+}
+
+/* Override transition for elements that shouldn't animate on theme change */
+*:focus,
+input,
+textarea,
+button {
+  transition-property: none;
+}
+
+/* Custom focus ring */
+*:focus-visible {
+  outline: 2px solid var(--aiva-blue-ring);
+  outline-offset: 2px;
+}
+
+/* Selection color */
+::selection {
+  background: var(--aiva-blue-glow);
+  color: var(--text-primary);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-glow);
+}
+
+/* Top-edge loading bar */
+@keyframes loading-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--aiva-blue);
+  animation: loading-bar 1.5s ease-in-out infinite;
+  z-index: 9999;
+}
