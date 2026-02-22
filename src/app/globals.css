@@ -206,3 +206,27 @@ button {
   outline: none;
   box-shadow: inset 2px 0 0 0 var(--aiva-blue-ring);
 }
+
+/* Draft container loading bar */
+@keyframes draft-loading {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.draft-loading-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--aiva-blue), transparent);
+  animation: draft-loading 1.2s ease-in-out infinite;
+}
+
+/* Message body line clamp */
+.message-body-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

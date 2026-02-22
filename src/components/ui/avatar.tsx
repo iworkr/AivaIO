@@ -5,7 +5,7 @@ interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
   src?: string;
   alt?: string;
   initials?: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
 }
 
 function Avatar({ src, alt, initials, size = "md", className, ...props }: AvatarProps) {
@@ -13,6 +13,7 @@ function Avatar({ src, alt, initials, size = "md", className, ...props }: Avatar
     sm: "h-6 w-6 text-[10px]",
     md: "h-8 w-8 text-xs",
     lg: "h-10 w-10 text-sm",
+    xl: "h-16 w-16 text-2xl",
   };
 
   return (
