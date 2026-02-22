@@ -4,9 +4,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { EmptyState, LottieAnimation } from "@/components/ui";
+import { EmptyStateHook } from "@/components/app/empty-state-hook";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { fetchThreads, subscribeToMessages } from "@/lib/supabase/queries";
 import { useAuth } from "@/hooks/use-auth";
+import { useIntegrations } from "@/hooks/use-integrations";
 import {
   Mail, Hash, Phone, ShoppingBag, Sparkles,
   Archive, CheckCheck, RefreshCw,
@@ -68,6 +70,7 @@ export default function InboxPage() {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const { user } = useAuth();
+  const { hasAnyConnection } = useIntegrations();
   const router = useRouter();
   const hasSynced = useRef(false);
 
@@ -194,6 +197,8 @@ export default function InboxPage() {
       <div className="flex-1 overflow-y-auto">
         {isLoading && threads.length === 0 && !isSyncing ? (
           <SkeletonRows count={10} />
+        ) : !isLoading && !isSyncing && threads.length === 0 && !hasAnyConnection ? (
+          <EmptyStateHook type="INBOX" />
         ) : !isLoading && !isSyncing && threads.length === 0 ? (
           <EmptyState
             icon={<LottieAnimation src="/lottie/checkmark.json" autoplay style={{ width: 64, height: 64 }} />}

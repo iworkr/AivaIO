@@ -11,6 +11,8 @@ import {
 } from "@/lib/supabase/queries";
 import { useSupabaseQuery } from "@/hooks/use-supabase-query";
 import { AIResponseRenderer } from "@/components/widgets";
+import { EmptyStateHook } from "@/components/app/empty-state-hook";
+import { useIntegrations } from "@/hooks/use-integrations";
 import type { AIResponse, ShopifyWidgetData } from "@/types";
 import {
   ArrowLeft, Send, X, Sparkles, Lock, MailX,
@@ -53,6 +55,7 @@ function classifySender(email: string, hasShopify: boolean): ContextState {
 export default function ConversationPage() {
   const params = useParams();
   const router = useRouter();
+  const { isConnected } = useIntegrations();
   const threadId = params.threadId as string;
 
   const { data: thread, isLoading: threadLoading } = useSupabaseQuery(
@@ -588,6 +591,12 @@ export default function ConversationPage() {
                     <Ban size={14} /> Block Sender
                   </button>
                 </div>
+
+                {!isConnected("shopify") && (
+                  <div className="px-4 pb-4">
+                    <EmptyStateHook type="CRM" contactName={senderName} />
+                  </div>
+                )}
               </motion.div>
             )}
 

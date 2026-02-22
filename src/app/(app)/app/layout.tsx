@@ -1,17 +1,31 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/app/sidebar";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { LearningToast } from "@/components/app/learning-toast";
-import { CommandPalette, CommandItem, CommandGroup } from "@/components/ui";
-import { Home, Inbox, Star, FileText, Settings, Zap, Clock, Shield } from "lucide-react";
+import { Toast, CommandPalette, CommandItem, CommandGroup } from "@/components/ui";
+import { Home, Inbox, Star, FileText, Settings, Zap, Clock, Shield, CheckCircle } from "lucide-react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const success = searchParams.get("success");
+    const integration = searchParams.get("integration");
+    if (success === "true" && integration) {
+      setSuccessToast(`${integration.charAt(0).toUpperCase() + integration.slice(1)} connected successfully. Fetching historical data…`);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("success");
+      url.searchParams.delete("integration");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-[var(--background-main)]">
@@ -60,6 +74,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <KeyboardShortcuts />
       <LearningToast />
+
+      <Toast
+        visible={!!successToast}
+        message={successToast || ""}
+        icon={<CheckCircle size={16} className="text-green-400" />}
+        duration={5000}
+        onClose={() => setSuccessToast(null)}
+      />
     </div>
   );
 }

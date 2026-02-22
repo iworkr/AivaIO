@@ -2,14 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Avatar, Badge } from "@/components/ui";
+import { usePathname, useRouter } from "next/navigation";
+import { Avatar } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
+import { useAuth } from "@/hooks/use-auth";
+import { useIntegrations } from "@/hooks/use-integrations";
+import { GmailIcon, SlackIcon, ShopifyIcon } from "@/components/icons/brand-icons";
+import { ConnectionModal } from "./connection-modal";
 import {
-  Home, Inbox, Star, FileText, CheckSquare,
-  Settings, Sun, Moon, ChevronDown,
-  Menu, X,
+  Command, Inbox, Star, PenLine, CheckSquare,
+  Settings, Search, ChevronsUpDown,
+  Menu, X, Settings2,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -18,64 +21,63 @@ interface SidebarProps {
 }
 
 const mainLinks = [
-  { icon: Home, label: "Home", href: "/app" },
-  { icon: Inbox, label: "Inbox", href: "/app/inbox", badge: "12" },
+  { icon: Command, label: "Home", href: "/app" },
+  { icon: Inbox, label: "Inbox", href: "/app/inbox", badgeKey: "inbox" },
   { icon: Star, label: "VIP / Urgent", href: "/app/inbox?filter=vip" },
-  { icon: FileText, label: "Drafts", href: "/app/inbox?filter=drafts" },
+  { icon: PenLine, label: "Drafts", href: "/app/inbox?filter=drafts" },
   { icon: CheckSquare, label: "Tasks", href: "/app/inbox?filter=tasks" },
 ];
 
-const integrations = [
-  { svg: "/icons/gmail.svg", label: "Gmail", status: "active" as const },
-  { svg: "/icons/slack.svg", label: "Slack", status: "active" as const },
-  { svg: "/icons/whatsapp.svg", label: "WhatsApp", status: "disconnected" as const },
-  { svg: "/icons/shopify.svg", label: "Shopify", status: "active" as const },
-];
+const INTEGRATION_META: Record<string, { icon: React.FC<{ size?: number; className?: string }>; label: string }> = {
+  gmail: { icon: GmailIcon, label: "Gmail" },
+  slack: { icon: SlackIcon, label: "Slack" },
+  shopify: { icon: ShopifyIcon, label: "Shopify" },
+};
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
-  const [isDark, setIsDark] = useState(true);
-  const [wsDropdown, setWsDropdown] = useState(false);
+  const router = useRouter();
+  const { user } = useAuth();
+  const { integrations } = useIntegrations();
+  const [hoveredIntegration, setHoveredIntegration] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState<string | null>(null);
 
-  const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle("light");
-    document.documentElement.classList.toggle("dark");
-  };
+  const userName = (user?.user_metadata?.full_name as string) || user?.email?.split("@")[0] || "User";
+  const userEmail = user?.email || "";
+  const userInitial = userName[0]?.toUpperCase() || "?";
 
   return (
     <>
       {/* Mobile toggle */}
       <button
         onClick={onToggle}
-        className="lg:hidden fixed top-4 left-4 z-50 h-9 w-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--background-sidebar)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+        className="lg:hidden fixed top-4 left-4 z-50 h-9 w-9 rounded-lg border border-[var(--border-subtle)] bg-[#050505] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
       >
         {collapsed ? <Menu size={16} /> : <X size={16} />}
       </button>
 
       <aside
         className={cn(
-          "fixed top-0 left-0 bottom-0 z-40 w-[240px] bg-[var(--background-sidebar)] border-r border-[var(--border-subtle)]",
+          "fixed top-0 left-0 bottom-0 z-40 w-[240px] bg-[#050505] border-r border-[rgba(255,255,255,0.06)]",
           "flex flex-col transition-transform duration-200",
           "lg:translate-x-0",
           collapsed ? "-translate-x-full" : "translate-x-0"
         )}
       >
-        {/* Workspace header — 56px strict */}
-        <div
-          onClick={() => setWsDropdown(!wsDropdown)}
-          className="h-14 flex items-center px-4 border-b border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--surface-hover)] transition-colors"
-        >
-          <img src="/aiva-mark.svg" alt="AIVA" className="h-6 w-6 shrink-0" />
-          <span className="ml-2.5 text-sm font-medium text-[var(--text-primary)] tracking-tight flex-1 truncate">
-            AIVA Workspace
-          </span>
-          <ChevronDown size={14} className="text-[var(--text-tertiary)] shrink-0" />
+        {/* ═══ Top: AIVA Brand & Workspace ═══ */}
+        <div className="h-[56px] px-4 flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.03)] cursor-pointer transition-colors">
+          <div className="flex items-center min-w-0">
+            <img src="/aiva-mark.svg" alt="AIVA" className="h-6 w-6 shrink-0" />
+            <span className="ml-2 text-sm font-medium text-[var(--text-primary)] tracking-tight truncate">
+              AIVA Workspace
+            </span>
+          </div>
+          <ChevronsUpDown size={14} className="text-[var(--text-tertiary)] shrink-0" />
         </div>
 
-        {/* Main navigation */}
-        <nav className="flex-1 overflow-y-auto pt-4 px-2">
-          <div className="space-y-0.5">
+        {/* ═══ Core Navigation ═══ */}
+        <nav className="flex-1 overflow-y-auto">
+          <div className="mt-4 px-2 flex flex-col gap-0.5">
             {mainLinks.map((link) => {
               const Icon = link.icon;
               const isActive = pathname === link.href ||
@@ -86,17 +88,23 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   key={link.label}
                   href={link.href}
                   className={cn(
-                    "flex items-center gap-3 h-8 px-3 mx-0 rounded-md text-sm transition-colors duration-100",
+                    "h-[32px] rounded-md flex items-center px-2 group transition-colors duration-150",
                     isActive
-                      ? "bg-[var(--surface-active)] text-[var(--text-primary)] font-medium"
-                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+                      ? "bg-[rgba(255,255,255,0.08)] text-[var(--text-primary)] font-medium"
+                      : "text-[var(--text-secondary)] font-normal hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--text-primary)]"
                   )}
                 >
-                  <Icon size={16} className="shrink-0" />
-                  <span className="flex-1 truncate">{link.label}</span>
-                  {link.badge && (
-                    <span className="bg-blue-500/10 text-blue-400 text-[11px] font-mono px-1.5 py-0.5 rounded leading-none">
-                      {link.badge}
+                  <Icon
+                    size={16}
+                    className={cn(
+                      "shrink-0 mr-3",
+                      isActive ? "text-[var(--text-primary)]" : "text-[var(--text-tertiary)] group-hover:text-[var(--text-secondary)]"
+                    )}
+                  />
+                  <span className="flex-1 text-sm truncate">{link.label}</span>
+                  {link.badgeKey === "inbox" && (
+                    <span className="bg-blue-500/10 text-blue-400 text-[10px] font-mono px-1.5 rounded leading-none py-0.5">
+                      12
                     </span>
                   )}
                 </Link>
@@ -104,67 +112,102 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             })}
           </div>
 
-          {/* Integrations */}
+          {/* ═══ Connected Tools ═══ */}
           <div className="mt-6">
-            <p className="text-[11px] font-semibold tracking-wider uppercase text-[var(--text-tertiary)] px-3 mb-2">
-              Integrations
+            <p className="text-[11px] font-semibold tracking-wider uppercase text-[var(--text-tertiary)] px-4 mb-2">
+              Connected Tools
             </p>
-            <div className="space-y-0.5">
-              {integrations.map((int) => (
-                <div
-                  key={int.label}
-                  className="flex items-center gap-3 h-7 px-3 text-sm text-[var(--text-secondary)]"
+            <div className="px-2 flex flex-col gap-0.5">
+              {integrations.length > 0 ? (
+                integrations.map((int) => {
+                  const meta = INTEGRATION_META[int.provider];
+                  if (!meta) return null;
+                  const BrandIcon = meta.icon;
+                  const isHovered = hoveredIntegration === int.id;
+                  const needsReauth = int.status === "needs_reauth";
+
+                  return (
+                    <div
+                      key={int.id}
+                      onMouseEnter={() => setHoveredIntegration(int.id)}
+                      onMouseLeave={() => setHoveredIntegration(null)}
+                      className="h-[32px] rounded-md flex items-center px-2 group hover:bg-[rgba(255,255,255,0.04)] transition-colors cursor-default"
+                    >
+                      <BrandIcon
+                        size={16}
+                        className={cn(
+                          "shrink-0 mr-3 transition-all duration-200",
+                          isHovered ? "grayscale-0 opacity-100" : "grayscale opacity-60"
+                        )}
+                      />
+                      <span className="flex-1 text-sm text-[var(--text-secondary)] truncate">
+                        {meta.label}
+                      </span>
+
+                      {isHovered ? (
+                        <button
+                          onClick={() => router.push("/app/settings")}
+                          className="size-5 rounded flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                        >
+                          <Settings2 size={12} />
+                        </button>
+                      ) : (
+                        <div
+                          className={cn(
+                            "size-2 rounded-full",
+                            needsReauth
+                              ? "bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]"
+                              : "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]"
+                          )}
+                        />
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <button
+                  onClick={() => setConnecting("gmail")}
+                  className="h-[32px] rounded-md flex items-center px-2 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.04)] transition-colors w-full"
                 >
-                  <Image
-                    src={int.svg}
-                    alt={int.label}
-                    width={14}
-                    height={14}
-                    className="shrink-0 opacity-60"
-                  />
-                  <span className="flex-1 truncate text-xs">{int.label}</span>
-                  <div
-                    className={cn(
-                      "w-2 h-2 rounded-full",
-                      int.status === "active"
-                        ? "bg-[var(--status-success)] shadow-[0_0_8px_var(--status-success-glow)]"
-                        : "bg-zinc-700"
-                    )}
-                  />
-                </div>
-              ))}
+                  <span className="text-[var(--text-tertiary)] mr-3">+</span>
+                  Connect an integration
+                </button>
+              )}
             </div>
           </div>
         </nav>
 
-        {/* Bottom section — pinned */}
-        <div className="mt-auto p-3 border-t border-[var(--border-subtle)] space-y-0.5">
+        {/* ═══ Bottom: User & System ═══ */}
+        <div className="mt-auto pb-4 px-2 border-t border-[rgba(255,255,255,0.06)] pt-2 space-y-0.5">
           <Link
             href="/app/settings"
             className={cn(
-              "flex items-center gap-3 h-8 px-3 rounded-md text-sm transition-colors duration-100",
+              "h-[32px] rounded-md flex items-center px-2 text-sm transition-colors duration-150",
               pathname === "/app/settings"
-                ? "bg-[var(--surface-active)] text-[var(--text-primary)] font-medium"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+                ? "bg-[rgba(255,255,255,0.08)] text-[var(--text-primary)] font-medium"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)]"
             )}
           >
-            <Settings size={16} />
+            <Settings size={16} className="shrink-0 mr-3 text-[var(--text-tertiary)]" />
             <span className="flex-1">Settings</span>
           </Link>
           <button
-            onClick={toggleTheme}
-            className="flex items-center gap-3 h-8 px-3 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors duration-100 w-full"
+            className="h-[32px] rounded-md flex items-center px-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)] transition-colors duration-150 w-full"
           >
-            {isDark ? <Sun size={16} /> : <Moon size={16} />}
-            <span className="flex-1 text-left">{isDark ? "Light Mode" : "Dark Mode"}</span>
-            <kbd className="text-[9px] font-mono text-[var(--text-tertiary)]">⌘⇧L</kbd>
+            <Search size={16} className="shrink-0 mr-3 text-[var(--text-tertiary)]" />
+            <span className="flex-1 text-left">Search</span>
+            <kbd className="text-[9px] font-mono text-[var(--text-tertiary)] bg-[rgba(255,255,255,0.04)] px-1.5 py-0.5 rounded">
+              ⌘K
+            </kbd>
           </button>
-          <div className="flex items-center gap-3 h-8 px-3">
-            <Avatar initials="JD" size="sm" />
-            <span className="text-xs text-[var(--text-secondary)] flex-1 truncate">john@acme.com</span>
+          <div className="h-[36px] flex items-center px-2 gap-3">
+            <Avatar initials={userInitial} size="sm" />
+            <span className="text-xs text-[var(--text-secondary)] flex-1 truncate">{userEmail}</span>
           </div>
         </div>
       </aside>
+
+      <ConnectionModal provider={connecting} onClose={() => setConnecting(null)} />
     </>
   );
 }

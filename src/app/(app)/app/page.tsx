@@ -6,9 +6,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useAuth } from "@/hooks/use-auth";
+import { useIntegrations } from "@/hooks/use-integrations";
 import { useSupabaseQuery } from "@/hooks/use-supabase-query";
 import { fetchThreads } from "@/lib/supabase/queries";
 import { AIResponseRenderer, ResearchingState } from "@/components/widgets";
+import { EmptyStateHook } from "@/components/app/empty-state-hook";
 import type { AIResponse } from "@/types";
 import {
   ArrowUp, Paperclip, Mic, Sparkles,
@@ -265,6 +267,7 @@ function InputBar({
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { hasAnyConnection } = useIntegrations();
   const router = useRouter();
   const [chatActive, setChatActive] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -443,6 +446,17 @@ export default function DashboardPage() {
               onAction={() => sendMessage("Who am I waiting on a reply from? Draft a follow-up.")}
             />
           </motion.div>
+
+          {!hasAnyConnection && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full max-w-4xl mb-8"
+            >
+              <EmptyStateHook type="CHAT" />
+            </motion.div>
+          )}
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
