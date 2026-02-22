@@ -11,7 +11,7 @@ const DataRow = React.forwardRef<HTMLDivElement, DataRowProps>(
     <div
       ref={ref}
       className={cn(
-        "flex items-center h-12 px-4 gap-3 cursor-pointer transition-colors duration-100",
+        "flex items-center h-12 px-4 gap-3 cursor-pointer transition-colors duration-150",
         "border-b border-[var(--border-subtle)]",
         "hover:bg-[var(--surface-hover)]",
         active && "bg-[var(--surface-active)]",

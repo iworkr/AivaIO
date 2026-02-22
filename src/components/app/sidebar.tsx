@@ -3,13 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { Avatar, Badge } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import {
   Inbox, Star, FileText, CheckSquare,
-  Settings, Sun, Moon, ChevronDown, LogOut,
+  Settings, Sun, Moon, ChevronDown,
   Menu, X,
 } from "lucide-react";
 
@@ -32,13 +31,6 @@ const integrations = [
   { svg: "/icons/shopify.svg", label: "Shopify", status: "active" as const },
 ];
 
-const statusColors = {
-  active: "bg-[var(--status-success)]",
-  syncing: "bg-[var(--status-warning)]",
-  connecting: "bg-[var(--status-warning)]",
-  disconnected: "bg-[var(--text-tertiary)]",
-};
-
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const [isDark, setIsDark] = useState(true);
@@ -60,7 +52,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {collapsed ? <Menu size={16} /> : <X size={16} />}
       </button>
 
-      {/* Sidebar */}
       <aside
         className={cn(
           "fixed top-0 left-0 bottom-0 z-40 w-[240px] bg-[var(--background-sidebar)] border-r border-[var(--border-subtle)]",
@@ -69,22 +60,20 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           collapsed ? "-translate-x-full" : "translate-x-0"
         )}
       >
-        {/* Workspace header */}
-        <div className="p-4 border-b border-[var(--border-subtle)]">
-          <button
-            onClick={() => setWsDropdown(!wsDropdown)}
-            className="flex items-center gap-2 w-full hover:bg-[var(--surface-hover)] rounded-lg p-1.5 -m-1.5 transition-colors"
-          >
-            <img src="/aiva-mark.svg" alt="AIVA" className="h-6 w-6" />
-            <span className="text-sm font-medium text-[var(--text-primary)] flex-1 text-left truncate">
-              AIVA Workspace
-            </span>
-            <ChevronDown size={14} className="text-[var(--text-tertiary)]" />
-          </button>
+        {/* Workspace header — 56px strict */}
+        <div
+          onClick={() => setWsDropdown(!wsDropdown)}
+          className="h-14 flex items-center px-4 border-b border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--surface-hover)] transition-colors"
+        >
+          <img src="/aiva-mark.svg" alt="AIVA" className="h-6 w-6 shrink-0" />
+          <span className="ml-2.5 text-sm font-medium text-[var(--text-primary)] tracking-tight flex-1 truncate">
+            AIVA Workspace
+          </span>
+          <ChevronDown size={14} className="text-[var(--text-tertiary)] shrink-0" />
         </div>
 
         {/* Main navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2">
+        <nav className="flex-1 overflow-y-auto pt-4 px-2">
           <div className="space-y-0.5">
             {mainLinks.map((link) => {
               const Icon = link.icon;
@@ -94,18 +83,18 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   key={link.label}
                   href={link.href}
                   className={cn(
-                    "flex items-center gap-3 h-8 px-2.5 rounded-md text-sm transition-colors duration-100",
+                    "flex items-center gap-3 h-8 px-3 mx-0 rounded-md text-sm transition-colors duration-100",
                     isActive
-                      ? "bg-[var(--surface-hover)] text-[var(--text-primary)]"
+                      ? "bg-[var(--surface-active)] text-[var(--text-primary)] font-medium"
                       : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
                   )}
                 >
                   <Icon size={16} className="shrink-0" />
                   <span className="flex-1 truncate">{link.label}</span>
                   {link.badge && (
-                    <Badge variant="blue" size="sm" className="px-1.5 py-0 h-[18px] text-[10px]">
+                    <span className="bg-blue-500/10 text-blue-400 text-[11px] font-mono px-1.5 py-0.5 rounded leading-none">
                       {link.badge}
-                    </Badge>
+                    </span>
                   )}
                 </Link>
               );
@@ -113,15 +102,15 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </div>
 
           {/* Integrations */}
-          <div className="mt-6 pt-4 border-t border-[var(--border-subtle)]">
-            <p className="text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--text-tertiary)] px-2.5 mb-2">
+          <div className="mt-6">
+            <p className="text-[11px] font-semibold tracking-wider uppercase text-[var(--text-tertiary)] px-3 mb-2">
               Integrations
             </p>
             <div className="space-y-0.5">
               {integrations.map((int) => (
                 <div
                   key={int.label}
-                  className="flex items-center gap-3 h-7 px-2.5 text-sm text-[var(--text-secondary)]"
+                  className="flex items-center gap-3 h-7 px-3 text-sm text-[var(--text-secondary)]"
                 >
                   <Image
                     src={int.svg}
@@ -131,31 +120,43 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     className="shrink-0 opacity-60"
                   />
                   <span className="flex-1 truncate text-xs">{int.label}</span>
-                  <div className={cn("w-1.5 h-1.5 rounded-full", statusColors[int.status])} />
+                  <div
+                    className={cn(
+                      "w-2 h-2 rounded-full",
+                      int.status === "active"
+                        ? "bg-[var(--status-success)] shadow-[0_0_8px_var(--status-success-glow)]"
+                        : "bg-zinc-700"
+                    )}
+                  />
                 </div>
               ))}
             </div>
           </div>
         </nav>
 
-        {/* Bottom section */}
-        <div className="p-3 border-t border-[var(--border-subtle)] space-y-1">
+        {/* Bottom section — pinned */}
+        <div className="mt-auto p-3 border-t border-[var(--border-subtle)] space-y-0.5">
           <Link
             href="/app/settings"
-            className="flex items-center gap-3 h-8 px-2.5 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
+            className={cn(
+              "flex items-center gap-3 h-8 px-3 rounded-md text-sm transition-colors duration-100",
+              pathname === "/app/settings"
+                ? "bg-[var(--surface-active)] text-[var(--text-primary)] font-medium"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+            )}
           >
             <Settings size={16} />
             <span className="flex-1">Settings</span>
           </Link>
           <button
             onClick={toggleTheme}
-            className="flex items-center gap-3 h-8 px-2.5 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors w-full"
+            className="flex items-center gap-3 h-8 px-3 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors duration-100 w-full"
           >
             {isDark ? <Sun size={16} /> : <Moon size={16} />}
             <span className="flex-1 text-left">{isDark ? "Light Mode" : "Dark Mode"}</span>
             <kbd className="text-[9px] font-mono text-[var(--text-tertiary)]">⌘⇧L</kbd>
           </button>
-          <div className="flex items-center gap-3 h-8 px-2.5">
+          <div className="flex items-center gap-3 h-8 px-3">
             <Avatar initials="JD" size="sm" />
             <span className="text-xs text-[var(--text-secondary)] flex-1 truncate">john@acme.com</span>
           </div>
