@@ -18,17 +18,16 @@ export async function POST(request: Request) {
   }
 
   const state = randomBytes(16).toString("hex");
+  const statePayload = JSON.stringify({ provider, userId: user.id, state });
+  const encodedState = Buffer.from(statePayload).toString("base64url");
 
-  // Store state for CSRF validation
-  await supabase.from("channel_connections").upsert({
-    user_id: user.id,
-    provider,
-    status: "connecting",
-    oauth_state: state,
-    workspace_id: user.user_metadata?.workspace_id,
-  });
-
-  const authUrl = buildOAuthUrl(provider, state, shopDomain);
-
-  return NextResponse.json({ authUrl });
+  try {
+    const authUrl = buildOAuthUrl(provider, encodedState, shopDomain);
+    return NextResponse.json({ authUrl });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to build OAuth URL" },
+      { status: 500 }
+    );
+  }
 }

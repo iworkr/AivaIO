@@ -119,19 +119,37 @@ export default function SettingsPage() {
     }, 3000);
   };
 
+  const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
+
+  const handleConnect = async (provider: string) => {
+    setConnectingProvider(provider);
+    try {
+      const res = await fetch("/api/integrations/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider }),
+      });
+      const data = await res.json();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      }
+    } catch {
+      setConnectingProvider(null);
+    }
+  };
+
   const connectionList = [
     { provider: "gmail", name: "Gmail", desc: "Email inbox & sent history" },
     { provider: "slack", name: "Slack", desc: "Channels & direct messages" },
     { provider: "whatsapp", name: "WhatsApp", desc: "Business messaging" },
     { provider: "shopify", name: "Shopify", desc: "Orders, customers & support" },
   ].map((item) => {
-    const conn = (connections || []).find((c) => c.provider?.toLowerCase() === item.provider);
+    const conn = (connections || []).find((c: Record<string, unknown>) => (c.provider as string)?.toLowerCase() === item.provider);
     return {
       ...item,
-      status: conn?.status || "disconnected",
+      status: (conn?.status as string) || "disconnected",
       detail: conn?.status === "active"
-        ? `Connected. Last synced ${conn?.last_synced_at ? new Date(conn.last_synced_at).toLocaleString() : "recently"}.`
-        : conn?.status === "syncing" ? "Syncing historical data..."
+        ? `Connected${conn?.last_sync_at ? `. Last synced ${new Date(conn.last_sync_at as string).toLocaleString()}` : ""}.`
         : "Not connected.",
     };
   });
@@ -239,8 +257,13 @@ export default function SettingsPage() {
                         </div>
                         <p className="text-xs text-[var(--text-tertiary)]">{detail}</p>
                       </div>
-                      <Button variant={status === "disconnected" ? "blue" : "ghost"} size="sm">
-                        {status === "disconnected" ? "Connect" : "Configure"}
+                      <Button
+                        variant={status === "disconnected" ? "blue" : "ghost"}
+                        size="sm"
+                        onClick={() => status === "disconnected" && handleConnect(provider)}
+                        disabled={connectingProvider === provider}
+                      >
+                        {connectingProvider === provider ? "Connecting..." : status === "disconnected" ? "Connect" : "Configure"}
                       </Button>
                     </div>
                   );

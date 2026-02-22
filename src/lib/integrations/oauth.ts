@@ -33,19 +33,31 @@ export interface OAuthConfig {
   scopes: string[];
 }
 
+function getAppUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL
+    || process.env.NEXT_PUBLIC_SITE_URL
+    || process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : "http://localhost:3000";
+}
+
 export const oauthConfigs: Record<string, () => OAuthConfig> = {
   gmail: () => ({
-    clientId: process.env.GMAIL_CLIENT_ID || "",
-    clientSecret: process.env.GMAIL_CLIENT_SECRET || "",
-    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/integrations/gmail/callback`,
+    clientId: process.env.GMAIL_CLIENT_ID || process.env.GOOGLE_CLIENT_ID || "",
+    clientSecret: process.env.GMAIL_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET || "",
+    redirectUri: `${getAppUrl()}/api/integrations/callback`,
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
     tokenUrl: "https://oauth2.googleapis.com/token",
-    scopes: ["https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.send"],
+    scopes: [
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.send",
+      "https://www.googleapis.com/auth/userinfo.email",
+    ],
   }),
   slack: () => ({
     clientId: process.env.SLACK_CLIENT_ID || "",
     clientSecret: process.env.SLACK_CLIENT_SECRET || "",
-    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/integrations/slack/callback`,
+    redirectUri: `${getAppUrl()}/api/integrations/callback`,
     authUrl: "https://slack.com/oauth/v2/authorize",
     tokenUrl: "https://slack.com/api/oauth.v2.access",
     scopes: ["channels:read", "channels:history", "chat:write", "users:read"],
@@ -53,9 +65,9 @@ export const oauthConfigs: Record<string, () => OAuthConfig> = {
   shopify: () => ({
     clientId: process.env.SHOPIFY_CLIENT_ID || "",
     clientSecret: process.env.SHOPIFY_CLIENT_SECRET || "",
-    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/integrations/shopify/callback`,
-    authUrl: "", // Dynamic per shop
-    tokenUrl: "", // Dynamic per shop
+    redirectUri: `${getAppUrl()}/api/integrations/callback`,
+    authUrl: "",
+    tokenUrl: "",
     scopes: ["read_customers", "read_orders"],
   }),
 };
@@ -73,7 +85,7 @@ export function buildOAuthUrl(provider: string, state: string, shopDomain?: stri
     }).toString();
   }
 
-  return `${config.authUrl}?` + new URLSearchParams({
+  const params: Record<string, string> = {
     client_id: config.clientId,
     redirect_uri: config.redirectUri,
     scope: config.scopes.join(" "),
@@ -81,14 +93,17 @@ export function buildOAuthUrl(provider: string, state: string, shopDomain?: stri
     state,
     access_type: "offline",
     prompt: "consent",
-  }).toString();
+  };
+
+  return `${config.authUrl}?` + new URLSearchParams(params).toString();
 }
 
 export async function exchangeCodeForToken(
   provider: string,
   code: string,
+  redirectUri: string,
   shopDomain?: string
-): Promise<{ accessToken: string; refreshToken?: string }> {
+): Promise<{ accessToken: string; refreshToken?: string; email?: string }> {
   const config = oauthConfigs[provider]?.();
   if (!config) throw new Error(`Unknown provider: ${provider}`);
 
@@ -103,21 +118,48 @@ export async function exchangeCodeForToken(
   };
 
   if (provider !== "shopify") {
-    body.redirect_uri = config.redirectUri;
+    body.redirect_uri = redirectUri;
     body.grant_type = "authorization_code";
   }
 
+  const contentType = provider === "slack"
+    ? "application/x-www-form-urlencoded"
+    : "application/json";
+
   const res = await fetch(tokenUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers: { "Content-Type": contentType },
+    body: contentType === "application/x-www-form-urlencoded"
+      ? new URLSearchParams(body).toString()
+      : JSON.stringify(body),
   });
 
-  if (!res.ok) throw new Error(`Token exchange failed: ${res.status}`);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Token exchange failed (${res.status}): ${text}`);
+  }
+
   const data = await res.json();
+
+  let email: string | undefined;
+
+  if (provider === "gmail" && data.access_token) {
+    try {
+      const profileRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${data.access_token}` },
+      });
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        email = profile.email;
+      }
+    } catch {
+      // non-critical
+    }
+  }
 
   return {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
+    email,
   };
 }

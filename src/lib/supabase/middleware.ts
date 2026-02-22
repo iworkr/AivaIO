@@ -5,7 +5,7 @@ export async function updateSession(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
 
   const code = searchParams.get("code");
-  if (code && pathname !== "/auth/callback") {
+  if (code && !pathname.startsWith("/api/") && pathname !== "/auth/callback") {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/callback";
     return NextResponse.redirect(url);

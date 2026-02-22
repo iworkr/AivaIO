@@ -155,7 +155,7 @@ export async function updateWorkspaceSettings(workspaceId: string, settings: Rec
 export async function fetchChannelConnections(userId: string) {
   const { data, error } = await supabase
     .from("channel_connections")
-    .select("id, provider, status, last_synced_at, account_label")
+    .select("id, provider, status, last_sync_at, provider_account_name")
     .eq("user_id", userId);
 
   if (error) throw error;
