@@ -128,23 +128,31 @@ ${JSON.stringify(threadDataForWidgets, null, 2)}
 ═══ RESPONSE FORMAT ═══
 Respond in JSON:
 {
-  "textSummary": "A markdown-formatted response. Use **bold** for emphasis, bullet lists (- item) for listing multiple items, and be concise. DO NOT use numbered inline text like '1) Google 2) Airbnb' — always use markdown bullet lists or numbered lists instead.",
+  "textSummary": "Brief conversational markdown text.",
   "widgets": [],
-  "citations": [
-    { "id": "cite_1", "source": "gmail", "snippet": "Subject line or short excerpt" }
-  ]
+  "citations": []
 }
 
+═══ CRITICAL: MUTUAL EXCLUSION RULE ═══
+When you include EMAIL_SUMMARY_CARD widgets, your textSummary must ONLY be a brief 1-2 sentence introduction.
+DO NOT list, enumerate, or describe the individual emails in the textSummary when widgets are present.
+The cards handle the data display — the text just sets the stage.
+
+BAD (redundant): "You have 25 emails. Here are the top ones: - From Google: Security alert... - From Airbnb: Write a review..."
+GOOD (concise): "You have **25 unread emails** today. I've highlighted the 3 most important ones below."
+
 ═══ FORMATTING RULES ═══
-1. textSummary MUST be valid Markdown. Use:
-   - **bold** for sender names, subjects, and key figures
-   - Bullet lists (- item) when mentioning multiple emails, not inline numbered text
-   - Keep paragraphs short (2-3 sentences max)
-   - Separate distinct sections with a blank line
+1. textSummary MUST be valid Markdown:
+   - **bold** for key figures and emphasis
+   - Keep it to 1-2 short sentences when widgets are attached
+   - Only use bullet lists when NO widgets are present and you need to describe items in prose
+   - Do NOT prefix data with labels like "From:", "Subject:", "Snippet:" — just write naturally
 
-2. CITATIONS: Add a citation for each specific email/thread you reference. The citation "snippet" should be the email subject line or a brief excerpt. Use source "gmail" for emails, "shopify" for orders. The citation "id" should be unique like "cite_1", "cite_2".
+2. CITATIONS: Only include when there are NO widgets. Use tiny inline references.
+   Format: { "id": "cite_1", "source": "gmail", "snippet": "Subject line" }
+   When widgets ARE present, set citations to an empty array [].
 
-3. EMAIL_SUMMARY_CARD WIDGETS: When the user asks to summarize or list emails, include the top 3 most important/relevant emails as EMAIL_SUMMARY_CARD widgets. Use this exact format:
+3. EMAIL_SUMMARY_CARD WIDGETS: When the user asks to summarize, list, or review emails, include the top 3 most relevant as widgets:
    {
      "type": "EMAIL_SUMMARY_CARD",
      "data": {
@@ -159,11 +167,11 @@ Respond in JSON:
        "isUnread": true | false
      }
    }
-   ONLY use data from AVAILABLE THREAD DATA above — do NOT fabricate thread IDs or data.
+   ONLY use data from AVAILABLE THREAD DATA — do NOT fabricate.
 
-4. SHOPIFY_CARD: Only generate for Shopify order queries when order data exists.
-5. ACTION_CARD: Use for suggestions/actions with actionType "primary" or "ghost".
-6. If the inbox is empty, say so directly.`;
+4. SHOPIFY_CARD: Only for Shopify order queries when data exists.
+5. ACTION_CARD: For suggestions/actions.
+6. If inbox is empty, say so directly with no widgets.`;
 
   const response = await callLLM([
     { role: "system", content: systemPrompt },

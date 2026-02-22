@@ -1,20 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Mail, Hash, ShoppingBag, ExternalLink, Pencil } from "lucide-react";
+import { Mail, Maximize2, PenLine } from "lucide-react";
+import { getBrandIcon } from "@/components/icons/brand-icons";
 import type { EmailSummaryWidgetData } from "@/types";
-
-const providerIcons = {
-  gmail: Mail,
-  slack: Hash,
-  shopify: ShoppingBag,
-};
 
 const priorityStyles: Record<string, string> = {
   urgent: "bg-red-500/10 text-red-400",
   high: "bg-amber-500/10 text-amber-400",
-  medium: "bg-zinc-500/10 text-zinc-400",
-  low: "bg-zinc-500/10 text-zinc-500",
+  medium: "",
+  low: "",
 };
 
 function timeAgo(ts: string): string {
@@ -32,54 +27,62 @@ function timeAgo(ts: string): string {
 
 export function EmailSummaryTile({ data }: { data: EmailSummaryWidgetData["data"] }) {
   const router = useRouter();
-  const Icon = providerIcons[data.provider] || Mail;
+
+  const BrandIcon = getBrandIcon(data.sender) || getBrandIcon(data.provider);
 
   return (
-    <div className="w-full bg-[#0A0A0A] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 hover:border-[rgba(255,255,255,0.15)] transition-colors group">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="h-6 w-6 rounded-full bg-[rgba(255,255,255,0.04)] flex items-center justify-center shrink-0">
-            <Icon size={12} className="text-[var(--text-tertiary)]" />
-          </div>
+    <div className="w-full bg-[#0A0A0A] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 flex flex-col gap-3 transition-colors hover:border-[rgba(255,255,255,0.15)] group">
+      {/* Header: Brand + Sender + Timestamp */}
+      <div className="flex items-center justify-between w-full">
+        <div className="flex items-center gap-2 min-w-0">
+          {BrandIcon ? (
+            <BrandIcon
+              size={16}
+              className="shrink-0 grayscale opacity-80 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-200"
+            />
+          ) : (
+            <Mail size={16} className="shrink-0 text-[var(--text-tertiary)]" />
+          )}
           <span className="text-sm font-medium text-[var(--text-primary)] truncate">
             {data.sender}
           </span>
-          <span className="text-[11px] text-[var(--text-tertiary)] font-mono shrink-0">
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {data.priority && data.priority !== "medium" && data.priority !== "low" && (
+            <span className={`text-[10px] px-2 py-0.5 rounded font-mono ${priorityStyles[data.priority]}`}>
+              {data.priority.toUpperCase()}
+            </span>
+          )}
+          <span className="text-xs font-mono text-[var(--text-tertiary)]">
             {timeAgo(data.timestamp)}
           </span>
         </div>
-        {data.priority && data.priority !== "medium" && (
-          <span className={`text-[10px] px-2 py-0.5 rounded font-mono shrink-0 ${priorityStyles[data.priority] || priorityStyles.medium}`}>
-            {data.priority.toUpperCase()}
-          </span>
-        )}
       </div>
 
-      {/* Body */}
-      <div className="mt-2.5">
-        <p className="text-sm font-medium text-[var(--text-primary)] leading-snug">
+      {/* Body: Subject + Snippet */}
+      <div>
+        <p className="text-[15px] font-semibold text-[var(--text-primary)] leading-snug">
           {data.subject}
         </p>
-        <p className="text-sm text-[var(--text-secondary)] leading-relaxed mt-1 line-clamp-2">
+        <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-2 mt-1">
           {data.snippet}
         </p>
       </div>
 
       {/* Actions */}
-      <div className="border-t border-[rgba(255,255,255,0.04)] mt-3 pt-3 flex gap-2">
+      <div className="flex items-center gap-2 pt-3 mt-1 border-t border-[rgba(255,255,255,0.04)]">
         <button
           onClick={() => router.push(`/app/inbox/${data.threadId}`)}
-          className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] px-2.5 py-1.5 rounded-md border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.03)] transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
         >
-          <ExternalLink size={11} />
+          <Maximize2 size={14} />
           Read Full
         </button>
         <button
           onClick={() => router.push(`/app/inbox/${data.threadId}`)}
-          className="inline-flex items-center gap-1.5 text-[11px] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] px-2.5 py-1.5 rounded-md border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.03)] transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
         >
-          <Pencil size={11} />
+          <PenLine size={14} />
           Draft Reply
         </button>
       </div>

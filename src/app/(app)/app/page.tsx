@@ -8,7 +8,7 @@ import remarkGfm from "remark-gfm";
 import { useAuth } from "@/hooks/use-auth";
 import { useSupabaseQuery } from "@/hooks/use-supabase-query";
 import { fetchThreads } from "@/lib/supabase/queries";
-import { AIResponseRenderer, ResearchingState, CitationPill } from "@/components/widgets";
+import { AIResponseRenderer, ResearchingState } from "@/components/widgets";
 import type { AIResponse } from "@/types";
 import {
   ArrowUp, Paperclip, Mic, Sparkles,
@@ -158,32 +158,76 @@ function InputBar({
 }) {
   const [focused, setFocused] = useState(false);
 
-  const wrapperClass = variant === "fixed"
-    ? "fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-3xl px-4 z-40"
-    : "w-full max-w-3xl";
+  if (variant === "fixed") {
+    return (
+      <div className="fixed bottom-0 left-[240px] right-0 h-32 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none flex items-end justify-center pb-8 z-50">
+        <div className="w-full max-w-3xl px-4 pointer-events-auto">
+          <div className="relative">
+            <AnimatePresence>
+              {showSlash && <SlashPopup onSelect={onSlashSelect} />}
+            </AnimatePresence>
+            <div className={`flex items-center gap-3 bg-[#0A0A0A]/80 backdrop-blur-xl rounded-full px-4 py-3 transition-all duration-200 ${
+              focused
+                ? "border border-[rgba(59,130,246,0.5)] shadow-[0_0_20px_rgba(59,130,246,0.1)]"
+                : "border border-[rgba(255,255,255,0.1)]"
+            }`}>
+              <Sparkles size={16} className="text-blue-400 brightness-125 shrink-0" />
+              <input
+                ref={inputRef}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmit(); }
+                }}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                placeholder={placeholder}
+                className="flex-1 bg-transparent text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-0 border-none"
+              />
+              <div className="flex items-center gap-2">
+                <button className="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors cursor-pointer">
+                  <Paperclip size={16} />
+                </button>
+                <button className="h-8 w-8 rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors cursor-pointer">
+                  <Mic size={16} />
+                </button>
+                <button
+                  onClick={onSubmit}
+                  disabled={!value.trim() || disabled}
+                  className={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${
+                    value.trim() && !disabled
+                      ? "bg-blue-500 text-white shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+                      : "bg-[rgba(255,255,255,0.05)] text-[var(--text-tertiary)]"
+                  }`}
+                >
+                  <ArrowUp size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={wrapperClass}>
+    <div className="w-full max-w-3xl">
       <div className="relative">
         <AnimatePresence>
           {showSlash && <SlashPopup onSelect={onSlashSelect} />}
         </AnimatePresence>
-
         <div className={`flex items-center gap-3 bg-[#0A0A0A] rounded-full px-4 py-3 transition-all duration-200 ${
           focused
             ? "border border-[rgba(59,130,246,0.5)] shadow-[0_0_20px_rgba(59,130,246,0.1)]"
             : "border border-[rgba(255,255,255,0.1)]"
-        } ${variant === "fixed" ? "shadow-[0_4px_24px_rgba(0,0,0,0.4)] backdrop-blur-md" : ""}`}>
+        }`}>
           <Sparkles size={16} className="text-[var(--aiva-blue)] shrink-0" />
           <input
             ref={inputRef}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onSubmit();
-              }
+              if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSubmit(); }
             }}
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
@@ -211,11 +255,9 @@ function InputBar({
           </div>
         </div>
       </div>
-      {variant === "centered" && (
-        <p className="text-center text-[10px] text-[var(--text-tertiary)] mt-3 font-mono">
-          Type <span className="text-[var(--text-secondary)]">/</span> for commands · Press <span className="text-[var(--text-secondary)]">Enter</span> to send
-        </p>
-      )}
+      <p className="text-center text-[10px] text-[var(--text-tertiary)] mt-3 font-mono">
+        Type <span className="text-[var(--text-secondary)]">/</span> for commands · Press <span className="text-[var(--text-secondary)]">Enter</span> to send
+      </p>
     </div>
   );
 }
@@ -421,7 +463,7 @@ export default function DashboardPage() {
         >
           {/* Chat Feed */}
           <div className="flex-1 overflow-y-auto">
-            <div className="w-full max-w-3xl mx-auto flex flex-col px-6 pt-8 pb-32">
+            <div className="w-full max-w-3xl mx-auto flex flex-col px-6 pt-8 pb-40">
               {messages.map((msg) => (
                 <motion.div
                   key={msg.id}
@@ -446,7 +488,7 @@ export default function DashboardPage() {
                   {/* Content Column */}
                   <div className="flex-1 min-w-0 flex flex-col gap-3">
                     {msg.role === "user" ? (
-                      <p className="text-[15px] leading-relaxed text-[var(--text-primary)]">
+                      <p className="text-[15px] leading-relaxed text-[#F4F4F5]">
                         {msg.text}
                       </p>
                     ) : (
@@ -459,19 +501,6 @@ export default function DashboardPage() {
                             >
                               {msg.text}
                             </ReactMarkdown>
-                            {msg.citations && msg.citations.length > 0 && (
-                              <div className="flex flex-wrap items-center gap-1.5 mt-3">
-                                {msg.citations.map((cite) => (
-                                  <CitationPill
-                                    key={cite.id}
-                                    source={cite.source}
-                                    label={cite.snippet.length > 30 ? cite.snippet.slice(0, 30) + "…" : cite.snippet}
-                                    snippet={cite.snippet}
-                                    messageId={cite.id}
-                                  />
-                                ))}
-                              </div>
-                            )}
                           </div>
                         )}
                         {msg.widgets && msg.widgets.length > 0 && (
@@ -479,7 +508,7 @@ export default function DashboardPage() {
                             response={{
                               textSummary: "",
                               widgets: msg.widgets,
-                              citations: msg.citations || [],
+                              citations: [],
                             }}
                           />
                         )}
