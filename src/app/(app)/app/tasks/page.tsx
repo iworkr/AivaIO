@@ -23,7 +23,7 @@ interface Task {
   id: string;
   title: string;
   description: string | null;
-  status: "todo" | "in_progress" | "done";
+  status: "pending" | "in_progress" | "completed" | "cancelled";
   priority: "high" | "medium" | "low";
   due_date: string | null;
   tags: string[];
@@ -52,9 +52,9 @@ const PRIORITY_CONFIG = {
 
 const STATUS_FILTERS = [
   { key: "all", label: "All" },
-  { key: "todo", label: "To-Do" },
+  { key: "pending", label: "To-Do" },
   { key: "in_progress", label: "In Progress" },
-  { key: "done", label: "Done" },
+  { key: "completed", label: "Done" },
 ];
 
 /* ═══════════════════ Helpers ═══════════════════ */
@@ -195,7 +195,7 @@ export default function TasksPage() {
   };
 
   const handleToggleStatus = async (task: Task) => {
-    const nextStatus = task.status === "done" ? "todo" : "done";
+    const nextStatus = task.status === "completed" ? "pending" : "completed";
     await fetch("/api/tasks", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -262,8 +262,8 @@ export default function TasksPage() {
   };
 
   const filteredTasks = tasks;
-  const todoTasks = filteredTasks.filter((t) => t.status !== "done");
-  const doneTasks = filteredTasks.filter((t) => t.status === "done");
+  const todoTasks = filteredTasks.filter((t) => t.status !== "completed" && t.status !== "cancelled");
+  const doneTasks = filteredTasks.filter((t) => t.status === "completed");
 
   if (isLoading) {
     return (
@@ -499,7 +499,7 @@ function TaskRow({
   onAddSubtask: () => void;
   onToggleSubtask: (id: string, completed: boolean) => void;
 }) {
-  const isDone = task.status === "done";
+  const isDone = task.status === "completed";
   const cfg = PRIORITY_CONFIG[task.priority];
   const dueLabel = formatRelativeDate(task.due_date);
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !isDone;

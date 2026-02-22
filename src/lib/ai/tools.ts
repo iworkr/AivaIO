@@ -75,7 +75,7 @@ export const TOOL_DEFINITIONS = [
       parameters: {
         type: "object",
         properties: {
-          status: { type: "string", enum: ["todo", "in_progress", "done"], description: "Filter by task status" },
+          status: { type: "string", enum: ["pending", "in_progress", "completed", "cancelled"], description: "Filter by task status" },
           priority: { type: "string", enum: ["high", "medium", "low"], description: "Filter by priority" },
         },
       },

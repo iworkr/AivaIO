@@ -77,7 +77,7 @@ export async function PATCH(req: NextRequest) {
     const { id, ...updates } = body;
     if (!id) return NextResponse.json({ error: "Missing task id" }, { status: 400 });
 
-    if (updates.status === "done" && !updates.completed_at) {
+    if (updates.status === "completed" && !updates.completed_at) {
       updates.completed_at = new Date().toISOString();
     }
 
