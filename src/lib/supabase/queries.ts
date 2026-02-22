@@ -185,7 +185,7 @@ export async function updateUserProfile(userId: string, updates: Record<string, 
 export async function updateUserSettings(userId: string, settings: Record<string, unknown>) {
   const { error } = await supabase
     .from("user_settings")
-    .upsert({ user_id: userId, ...settings });
+    .upsert({ id: userId, ...settings }, { onConflict: "id" });
 
   if (error) throw error;
 }

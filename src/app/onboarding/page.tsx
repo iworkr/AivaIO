@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { updateUserSettings } from "@/lib/supabase/queries";
 import {
   ArrowRight, Sun, Moon, Command, Mail, Hash, ShoppingBag,
-  Sparkles, Bell, Newspaper,
+  Sparkles, Check, Loader2,
 } from "lucide-react";
 
 const totalSteps = 6;
@@ -35,34 +35,69 @@ function StepWrapper({
   );
 }
 
+const integrations = [
+  { icon: Mail, name: "Gmail", desc: "Email inbox & sent history", provider: "gmail", color: "#EA4335" },
+  { icon: Hash, name: "Slack", desc: "Channels & direct messages", provider: "slack", color: "#E01E5A" },
+  { icon: ShoppingBag, name: "Shopify", desc: "Orders, customers & support", provider: "shopify", color: "#96BF48" },
+];
+
 export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [changelog, setChangelog] = useState(false);
   const [marketing, setMarketing] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [connectedProviders, setConnectedProviders] = useState<Set<string>>(new Set());
+  const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
   const router = useRouter();
   const { user } = useAuth();
 
   const next = async () => {
     if (step < totalSteps - 1) {
       setStep(step + 1);
-    } else {
+      return;
+    }
+
+    setFinishing(true);
+    try {
       if (user) {
         await updateUserSettings(user.id, {
-          theme: theme,
+          theme,
           subscribe_changelog: changelog,
           subscribe_marketing: marketing,
           onboarding_completed: true,
         });
       }
-      router.push("/app/inbox");
+    } catch {
+      // Settings save failed — don't block the user from entering the app
     }
+    router.push("/app/inbox");
   };
 
   const selectTheme = (t: "dark" | "light") => {
     setTheme(t);
     document.documentElement.classList.remove("dark", "light");
     document.documentElement.classList.add(t);
+  };
+
+  const handleConnect = async (provider: string) => {
+    setConnectingProvider(provider);
+    try {
+      const res = await fetch("/api/integrations/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider }),
+      });
+      const data = await res.json();
+      if (data.authUrl) {
+        setConnectedProviders((prev) => new Set(prev).add(provider));
+        window.open(data.authUrl, "_blank", "width=600,height=700");
+      }
+    } catch {
+      // Connection failed — user can retry or skip
+    } finally {
+      setConnectingProvider(null);
+    }
   };
 
   return (
@@ -180,27 +215,39 @@ export default function OnboardingPage() {
             </p>
 
             <div className="space-y-3 mb-8 max-w-sm mx-auto">
-              {[
-                { icon: Mail, name: "Gmail", desc: "Email inbox & sent history", color: "#EA4335" },
-                { icon: Hash, name: "Slack", desc: "Channels & direct messages", color: "#E01E5A" },
-                { icon: ShoppingBag, name: "Shopify", desc: "Orders, customers & support", color: "#96BF48" },
-              ].map(({ icon: Icon, name, desc }) => (
-                <div
-                  key={name}
-                  className="flex items-center gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--background-elevated)] p-4"
-                >
-                  <div className="h-10 w-10 rounded-lg bg-[var(--surface-hover)] flex items-center justify-center">
-                    <Icon size={18} className="text-[var(--text-secondary)]" />
+              {integrations.map(({ icon: Icon, name, desc, provider }) => {
+                const isConnected = connectedProviders.has(provider);
+                const isConnecting = connectingProvider === provider;
+                return (
+                  <div
+                    key={name}
+                    className="flex items-center gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--background-elevated)] p-4"
+                  >
+                    <div className="h-10 w-10 rounded-lg bg-[var(--surface-hover)] flex items-center justify-center">
+                      <Icon size={18} className="text-[var(--text-secondary)]" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <p className="text-sm font-medium text-[var(--text-primary)]">{name}</p>
+                      <p className="text-xs text-[var(--text-tertiary)]">{desc}</p>
+                    </div>
+                    {isConnected ? (
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--status-success)]">
+                        <Check size={14} />
+                        Connected
+                      </div>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handleConnect(provider)}
+                        disabled={isConnecting}
+                      >
+                        {isConnecting ? <Loader2 size={14} className="animate-spin" /> : "Connect"}
+                      </Button>
+                    )}
                   </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-sm font-medium text-[var(--text-primary)]">{name}</p>
-                    <p className="text-xs text-[var(--text-tertiary)]">{desc}</p>
-                  </div>
-                  <Button variant="secondary" size="sm">
-                    Connect
-                  </Button>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="flex items-center justify-center gap-3">
@@ -226,16 +273,16 @@ export default function OnboardingPage() {
                 Calibrating your tone
               </h2>
               <p className="text-sm text-[var(--text-secondary)] max-w-sm mx-auto">
-                AIVA is analyzing your communication history to learn your personal
-                writing style. This takes about 30 seconds.
+                AIVA will analyze your communication history to learn your personal
+                writing style once your email is connected.
               </p>
             </div>
 
             <div className="max-w-xs mx-auto mb-8">
               <div className="space-y-3 text-left">
                 {[
-                  { label: "Scanning sent emails...", done: true },
-                  { label: "Extracting tone dimensions...", done: true },
+                  { label: "Scanning sent emails...", done: connectedProviders.has("gmail") },
+                  { label: "Extracting tone dimensions...", done: false },
                   { label: "Building vocabulary profile...", done: false },
                   { label: "Selecting golden exemplars...", done: false },
                 ].map((item, i) => (
@@ -251,9 +298,9 @@ export default function OnboardingPage() {
                   </div>
                 ))}
               </div>
-              <div className="mt-4">
-                <ProgressBar value={65} />
-              </div>
+              <p className="text-xs text-[var(--text-tertiary)] mt-4">
+                Tone calibration will run automatically after your first sync.
+              </p>
             </div>
 
             <Button size="lg" onClick={next}>
@@ -290,9 +337,18 @@ export default function OnboardingPage() {
               </div>
             </div>
 
-            <Button size="xl" onClick={next}>
-              Enter AIVA
-              <ArrowRight size={16} />
+            <Button size="xl" onClick={next} disabled={finishing}>
+              {finishing ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Setting up...
+                </>
+              ) : (
+                <>
+                  Enter AIVA
+                  <ArrowRight size={16} />
+                </>
+              )}
             </Button>
           </StepWrapper>
         )}
