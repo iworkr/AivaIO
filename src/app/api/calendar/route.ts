@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabase
       .from("calendar_events")
-      .select("*")
+      .select("*, tasks(id, title, status, priority)")
       .eq("user_id", user.id)
       .lte("start_time", end)
       .gte("end_time", start)

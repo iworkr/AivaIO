@@ -1,4 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
+import {
+  classifyEmailIntent,
+  getSchedulingRules,
+  getFreeBusySlots,
+  findAvailableSlots,
+  createPendingAction,
+} from "./nexus-engine";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -113,6 +120,106 @@ export const TOOL_DEFINITIONS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "classify_email_intent",
+      description: "Classifies an email to determine if it's a meeting request, task/action item, newsletter, or general inquiry. Use when analyzing an email thread to suggest next actions.",
+      parameters: {
+        type: "object",
+        properties: {
+          thread_id: { type: "string", description: "The thread to classify" },
+        },
+        required: ["thread_id"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "find_available_times",
+      description: "Finds available time slots on the user's calendar within a date range. Use when scheduling meetings or timeboxing tasks. Respects buffer rules and no-meeting days.",
+      parameters: {
+        type: "object",
+        properties: {
+          date_from: { type: "string", description: "ISO date for start of search range" },
+          date_to: { type: "string", description: "ISO date for end of search range" },
+          duration_minutes: { type: "number", description: "Required duration in minutes (default 30)" },
+          count: { type: "number", description: "Number of available slots to return (default 3)" },
+        },
+        required: ["date_from", "date_to"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "schedule_meeting",
+      description: "Creates a pending AIVA action to schedule a meeting from an email thread. Proposes times based on calendar availability. Use when user asks to schedule a meeting or when an email contains a meeting request.",
+      parameters: {
+        type: "object",
+        properties: {
+          thread_id: { type: "string", description: "Source email thread ID" },
+          title: { type: "string", description: "Meeting title" },
+          duration_minutes: { type: "number", description: "Meeting duration in minutes" },
+          attendee_emails: { type: "array", items: { type: "string" }, description: "Attendee email addresses" },
+          preferred_date_from: { type: "string", description: "Start of preferred date range" },
+          preferred_date_to: { type: "string", description: "End of preferred date range" },
+          format: { type: "string", enum: ["call", "video", "in_person", "coffee"], description: "Meeting format" },
+          location: { type: "string", description: "Meeting location (for in-person)" },
+        },
+        required: ["thread_id", "title", "attendee_emails"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "timebox_email_task",
+      description: "Extracts a task from an email and creates a time-blocked calendar event. Use when an email contains an action item with a deadline.",
+      parameters: {
+        type: "object",
+        properties: {
+          thread_id: { type: "string", description: "Source email thread ID" },
+          task_title: { type: "string", description: "The task to complete" },
+          estimated_minutes: { type: "number", description: "Estimated time needed" },
+          deadline: { type: "string", description: "ISO date of the deadline" },
+        },
+        required: ["thread_id", "task_title", "estimated_minutes"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "create_calendar_event",
+      description: "Directly creates a calendar event for the user. Use when the user explicitly asks to add something to their calendar.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Event title" },
+          start_time: { type: "string", description: "ISO datetime for event start" },
+          end_time: { type: "string", description: "ISO datetime for event end" },
+          description: { type: "string", description: "Event description" },
+          location: { type: "string", description: "Event location" },
+          attendee_emails: { type: "array", items: { type: "string" }, description: "Attendee emails" },
+          thread_id: { type: "string", description: "Related email thread ID" },
+        },
+        required: ["title", "start_time", "end_time"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "get_daily_briefing",
+      description: "Generates today's daily briefing that cross-references the inbox with the calendar. Use when the user asks 'what does my day look like', 'briefing', or 'morning summary'.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
 ];
 
 export async function executeToolCall(
@@ -135,6 +242,18 @@ export async function executeToolCall(
       return createTaskTool(supabase, args);
     case "get_calendar_events":
       return getCalendarEventsTool(supabase, args);
+    case "classify_email_intent":
+      return classifyEmailIntentTool(supabase, args);
+    case "find_available_times":
+      return findAvailableTimesTool(supabase, args);
+    case "schedule_meeting":
+      return scheduleMeetingTool(supabase, args);
+    case "timebox_email_task":
+      return timeboxEmailTaskTool(supabase, args);
+    case "create_calendar_event":
+      return createCalendarEventTool(supabase, args);
+    case "get_daily_briefing":
+      return getDailyBriefingTool(supabase);
     default:
       return JSON.stringify({ error: `Unknown tool: ${toolName}` });
   }
@@ -322,7 +441,7 @@ async function getCalendarEventsTool(supabase: SupabaseClient, args: Record<stri
 
   const { data, error } = await supabase
     .from("calendar_events")
-    .select("id, title, start_time, end_time, location, color, task_id")
+    .select("id, title, start_time, end_time, location, color, task_id, attendees, created_by, source_thread_id, conference_url")
     .eq("user_id", user.id)
     .gte("start_time", args.date_from as string)
     .lte("end_time", args.date_to as string)
@@ -331,4 +450,226 @@ async function getCalendarEventsTool(supabase: SupabaseClient, args: Record<stri
 
   if (error) return JSON.stringify({ error: error.message });
   return JSON.stringify({ events: data || [], count: (data || []).length });
+}
+
+async function classifyEmailIntentTool(supabase: SupabaseClient, args: Record<string, unknown>): Promise<string> {
+  const threadId = args.thread_id as string;
+
+  const { data: messages } = await supabase
+    .from("messages")
+    .select("sender_name, sender_email, subject, body, snippet")
+    .eq("thread_id", threadId)
+    .order("timestamp", { ascending: false })
+    .limit(3);
+
+  if (!messages || messages.length === 0) return JSON.stringify({ error: "Thread not found or empty" });
+
+  const latest = messages[0];
+  const body = (latest.body as string) || (latest.snippet as string) || "";
+  const subject = (latest.subject as string) || "";
+
+  const classification = await classifyEmailIntent(subject, body, latest.sender_email || "");
+  return JSON.stringify(classification);
+}
+
+async function findAvailableTimesTool(supabase: SupabaseClient, args: Record<string, unknown>): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return JSON.stringify({ error: "Not authenticated" });
+
+  const rules = await getSchedulingRules(supabase, user.id);
+  const duration = (args.duration_minutes as number) || rules.defaultMeetingDuration;
+  const count = (args.count as number) || 3;
+
+  const freeBusy = await getFreeBusySlots(
+    supabase, user.id,
+    args.date_from as string,
+    args.date_to as string,
+    rules
+  );
+
+  const available = findAvailableSlots(freeBusy, duration, count);
+
+  return JSON.stringify({
+    availableSlots: available,
+    count: available.length,
+    rules: {
+      bufferMinutes: rules.bufferMinutes,
+      workingHours: `${rules.workingHoursStart}-${rules.workingHoursEnd}`,
+      noMeetingDays: rules.noMeetingDays,
+    },
+  });
+}
+
+async function scheduleMeetingTool(supabase: SupabaseClient, args: Record<string, unknown>): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return JSON.stringify({ error: "Not authenticated" });
+
+  const rules = await getSchedulingRules(supabase, user.id);
+  const duration = (args.duration_minutes as number) || rules.defaultMeetingDuration;
+  const attendees = (args.attendee_emails as string[]) || [];
+
+  const dateFrom = (args.preferred_date_from as string) || new Date().toISOString().split("T")[0];
+  const dateTo = (args.preferred_date_to as string) || (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split("T")[0];
+  })();
+
+  const freeBusy = await getFreeBusySlots(supabase, user.id, dateFrom, dateTo, rules);
+  const available = findAvailableSlots(freeBusy, duration, 3);
+
+  if (available.length === 0) {
+    return JSON.stringify({
+      success: false,
+      message: "No available time slots found in the requested range. Try a wider date range.",
+    });
+  }
+
+  const bestSlot = available[0];
+  const action = await createPendingAction(supabase, user.id, {
+    type: "create_calendar_event",
+    summary: `Schedule "${args.title}" with ${attendees.join(", ")}`,
+    details: {
+      threadId: args.thread_id as string,
+      calendarEvent: {
+        title: args.title as string,
+        startTime: bestSlot.start,
+        endTime: bestSlot.end,
+        attendees,
+        conferenceUrl: rules.defaultVideoLink || undefined,
+        location: args.location as string || undefined,
+      },
+    },
+    sourceThreadId: args.thread_id as string,
+    auditReason: `Meeting scheduled from email thread via Nexus engine`,
+    executedAt: undefined,
+  });
+
+  return JSON.stringify({
+    success: true,
+    pendingActionId: action.id,
+    proposedSlots: available.map((s) => ({
+      start: s.start,
+      end: s.end,
+      formatted: `${new Date(s.start).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} at ${new Date(s.start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`,
+    })),
+    selectedSlot: {
+      start: bestSlot.start,
+      end: bestSlot.end,
+      formatted: `${new Date(bestSlot.start).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} at ${new Date(bestSlot.start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`,
+    },
+    message: `Meeting "${args.title}" queued. ${available.length} available slot(s) found. The event will be created when approved.`,
+  });
+}
+
+async function timeboxEmailTaskTool(supabase: SupabaseClient, args: Record<string, unknown>): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return JSON.stringify({ error: "Not authenticated" });
+
+  const rules = await getSchedulingRules(supabase, user.id);
+  const estimatedMinutes = (args.estimated_minutes as number) || 60;
+  const deadline = (args.deadline as string) || (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 3);
+    return d.toISOString().split("T")[0];
+  })();
+
+  const now = new Date();
+  const freeBusy = await getFreeBusySlots(
+    supabase, user.id,
+    now.toISOString().split("T")[0],
+    deadline,
+    rules
+  );
+
+  const available = findAvailableSlots(freeBusy, estimatedMinutes, 1);
+
+  if (available.length === 0) {
+    return JSON.stringify({
+      success: false,
+      message: `No ${estimatedMinutes}-minute block available before ${deadline}. Consider extending the deadline.`,
+    });
+  }
+
+  const slot = available[0];
+  const action = await createPendingAction(supabase, user.id, {
+    type: "timebox_task",
+    summary: `Time-block "${args.task_title}" (${estimatedMinutes}min) before ${deadline}`,
+    details: {
+      threadId: args.thread_id as string,
+      task: {
+        title: args.task_title as string,
+        deadline,
+        estimatedMinutes,
+        sourceThreadId: args.thread_id as string,
+      },
+      calendarEvent: {
+        title: `Focus: ${args.task_title}`,
+        startTime: slot.start,
+        endTime: slot.end,
+      },
+    },
+    sourceThreadId: args.thread_id as string,
+    auditReason: `Task extracted from email and time-blocked via Nexus engine`,
+    executedAt: undefined,
+  });
+
+  return JSON.stringify({
+    success: true,
+    pendingActionId: action.id,
+    task: args.task_title,
+    scheduledBlock: {
+      start: slot.start,
+      end: slot.end,
+      formatted: `${new Date(slot.start).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })} ${new Date(slot.start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} – ${new Date(slot.end).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`,
+    },
+    message: `Task "${args.task_title}" queued with a ${estimatedMinutes}-min focus block. Will be created when approved.`,
+  });
+}
+
+async function createCalendarEventTool(supabase: SupabaseClient, args: Record<string, unknown>): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return JSON.stringify({ error: "Not authenticated" });
+
+  const { data, error } = await supabase
+    .from("calendar_events")
+    .insert({
+      user_id: user.id,
+      title: args.title as string,
+      start_time: args.start_time as string,
+      end_time: args.end_time as string,
+      description: (args.description as string) || null,
+      location: (args.location as string) || null,
+      attendees: (args.attendee_emails as string[]) || [],
+      created_by: "aiva",
+      source_thread_id: (args.thread_id as string) || null,
+    })
+    .select()
+    .single();
+
+  if (error) return JSON.stringify({ error: error.message });
+
+  await supabase.from("ai_action_logs").insert({
+    user_id: user.id,
+    action_type: "create_calendar_event",
+    summary: `Created event "${args.title}"`,
+    details: { eventId: data.id, ...args },
+    sent_at: new Date().toISOString(),
+  });
+
+  return JSON.stringify({
+    success: true,
+    event: data,
+    message: `Calendar event "${args.title}" created successfully.`,
+  });
+}
+
+async function getDailyBriefingTool(supabase: SupabaseClient): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return JSON.stringify({ error: "Not authenticated" });
+
+  const { generateDailyBriefing } = await import("./nexus-engine");
+  const briefing = await generateDailyBriefing(supabase, user.id, "America/New_York");
+
+  return JSON.stringify(briefing);
 }

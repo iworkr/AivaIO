@@ -21,6 +21,7 @@ import {
   ChevronDown, ChevronRight, Tag,
 } from "lucide-react";
 import Link from "next/link";
+import { NexusActionBar } from "@/components/app/nexus-action-bar";
 
 type ContextState = "ecommerce" | "standard" | "promo";
 
@@ -232,18 +233,55 @@ export default function ConversationPage() {
     return () => window.removeEventListener("keydown", handler);
   }, [draftText, handleSend]);
 
+  const handleScheduleMeeting = useCallback(async (tid: string) => {
+    try {
+      const threadData = thread;
+      const participants = threadData?.participants || [];
+      const emails = participants.map((p: { email: string }) => p.email).filter(Boolean);
+
+      await fetch("/api/ai/nexus/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId: tid,
+          title: thread?.subject || "Meeting",
+          attendeeEmails: emails,
+          format: "video",
+        }),
+      });
+    } catch { /* handled by action bar feedback */ }
+  }, [thread]);
+
+  const handleTimeboxTask = useCallback(async (tid: string) => {
+    try {
+      await fetch("/api/ai/nexus/timebox", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId: tid,
+          taskTitle: `Handle: ${thread?.subject || "Email task"}`,
+          estimatedMinutes: 60,
+        }),
+      });
+    } catch { /* handled by action bar feedback */ }
+  }, [thread]);
+
+  const handleDecline = useCallback(async (_tid: string) => {
+    // Placeholder: could auto-draft a contextual decline
+  }, []);
+
   const ltv = shopifyCustomer?.total_spent ? Number(shopifyCustomer.total_spent) : 0;
   const ordersCount = shopifyCustomer?.orders_count || 0;
 
   return (
-    <div className="h-screen flex flex-col bg-[#000000]">
+    <div className="h-screen flex flex-col bg-[var(--background-main)]">
       {isLoading && <LoadingBar />}
 
       {/* ───────── THREAD HEADER — 64px strict ───────── */}
-      <div className="h-16 flex items-center px-6 border-b border-[rgba(255,255,255,0.06)] shrink-0">
+      <div className="h-16 flex items-center px-6 border-b border-[var(--border-subtle)] shrink-0">
         <Link
           href="/app/inbox"
-          className="lg:hidden h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)] mr-3"
+          className="lg:hidden h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] mr-3"
         >
           <ArrowLeft size={16} />
         </Link>
@@ -254,7 +292,7 @@ export default function ConversationPage() {
           </h1>
           <div className="flex items-center gap-2 mt-0.5">
             {thread?.priority && (
-              <span className="bg-[rgba(255,255,255,0.1)] text-[var(--text-secondary)] text-[10px] font-mono px-2 py-0.5 rounded">
+              <span className="bg-[var(--surface-pill)] text-[var(--text-secondary)] text-[10px] font-mono px-2 py-0.5 rounded">
                 {thread.priority}
               </span>
             )}
@@ -274,29 +312,39 @@ export default function ConversationPage() {
         )}
 
         <div className="flex items-center gap-1">
-          <button className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)]" title="Archive">
+          <button className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]" title="Archive">
             <Archive size={16} />
           </button>
-          <button className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)]" title="Mark unread">
+          <button className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]" title="Mark unread">
             <MailOpen size={16} />
           </button>
-          <button className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)]" title="Delete">
+          <button className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]" title="Delete">
             <Trash2 size={16} />
           </button>
           <button
             onClick={() => setMobileCrmOpen(!mobileCrmOpen)}
-            className="xl:hidden h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)]"
+            className="xl:hidden h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
           >
             <User size={16} />
           </button>
         </div>
       </div>
 
+      {/* ───────── NEXUS GHOST UI — Suggested Actions ───────── */}
+      {!isLoading && messages && messages.length > 0 && (
+        <NexusActionBar
+          threadId={threadId}
+          onScheduleMeeting={handleScheduleMeeting}
+          onTimeboxTask={handleTimeboxTask}
+          onDecline={handleDecline}
+        />
+      )}
+
       {/* ───────── SPLIT VIEW: Thread + Context Panel ───────── */}
       <div className="flex-1 flex overflow-hidden">
 
         {/* ═══════ CENTER PANE ═══════ */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-[#000000]">
+        <div className="flex-1 flex flex-col overflow-hidden bg-[var(--background-main)]">
 
           {/* ── Message Feed ── */}
           <div className={`flex-1 overflow-y-auto transition-opacity duration-200 ${isLoading ? "opacity-40" : ""}`}>
@@ -310,11 +358,11 @@ export default function ConversationPage() {
                   <motion.div
                     key={msg.id}
                     variants={staggerItem}
-                    className="py-6 px-6 border-b border-[rgba(255,255,255,0.03)]"
+                    className="py-6 px-6 border-b border-[var(--border-subtle)]"
                   >
                     {/* Sender meta row */}
                     <div className="flex items-center">
-                      <div className="h-8 w-8 rounded-full bg-zinc-900 flex items-center justify-center text-xs text-[var(--text-secondary)] shrink-0">
+                      <div className="h-8 w-8 rounded-full bg-[var(--background-elevated)] flex items-center justify-center text-xs text-[var(--text-secondary)] shrink-0">
                         {getInitials(msg.sender_name)}
                       </div>
                       <span className="text-[var(--text-primary)] font-medium text-sm ml-3">
@@ -348,7 +396,7 @@ export default function ConversationPage() {
 
             {/* AI widget */}
             {aiResponse && (
-              <motion.div variants={linearFadeIn} initial="hidden" animate="visible" className="py-6 px-6 border-b border-[rgba(255,255,255,0.03)]">
+              <motion.div variants={linearFadeIn} initial="hidden" animate="visible" className="py-6 px-6 border-b border-[var(--border-subtle)]">
                 <div className="flex items-center">
                   <div className="h-8 w-8 rounded-full bg-[var(--aiva-blue-glow)] flex items-center justify-center shrink-0">
                     <Sparkles size={14} className="text-[var(--aiva-blue)]" />
@@ -368,10 +416,10 @@ export default function ConversationPage() {
           {/* ── AI DRAFT ENGINE ── */}
           <div
             ref={draftRef}
-            className={`relative bg-[#0A0A0A] p-4 transition-colors duration-200 ${
+            className={`relative bg-[var(--background-elevated)] p-4 transition-colors duration-200 ${
               draftFocused
-                ? "border-t border-[rgba(59,130,246,0.5)]"
-                : "border-t border-[rgba(255,255,255,0.08)]"
+                ? "border-t border-[var(--aiva-blue-ring)]"
+                : "border-t border-[var(--border-default)]"
             }`}
           >
             {/* Loading bar for tone rewrite */}
@@ -386,8 +434,8 @@ export default function ConversationPage() {
                   disabled={isRewriting}
                   className={`border rounded-full px-3 py-1 text-xs transition-all duration-150 ${
                     activeTone === tone
-                      ? "bg-[rgba(59,130,246,0.1)] border-[#3B82F6] text-[#3B82F6]"
-                      : "border-[rgba(255,255,255,0.1)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.2)]"
+                      ? "bg-[var(--surface-accent)] border-[var(--aiva-blue)] text-[var(--aiva-blue)]"
+                      : "border-[var(--border-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-glow)]"
                   } disabled:opacity-50`}
                 >
                   {tone}
@@ -419,7 +467,7 @@ export default function ConversationPage() {
 
               <div className="flex items-center gap-2">
                 <button
-                  className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.04)] transition-colors"
+                  className="h-8 w-8 rounded-lg flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] transition-colors"
                   title="Auto-send trainer"
                 >
                   <Lock size={14} />
@@ -428,7 +476,7 @@ export default function ConversationPage() {
                 <button
                   onClick={handleSend}
                   disabled={isSending || !draftText}
-                  className="bg-[#3B82F6] text-white font-medium text-sm px-4 py-2 rounded-md shadow-[0_0_15px_rgba(59,130,246,0.2)] hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="bg-[var(--aiva-blue)] text-white font-medium text-sm px-4 py-2 rounded-md shadow-[0_0_15px_var(--aiva-blue-glow)] hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <Send size={14} />
                   {isSending ? "Sending…" : "Approve & Send"}
@@ -443,13 +491,13 @@ export default function ConversationPage() {
         <AnimatePresence>
           <div className={`${
             mobileCrmOpen
-              ? "fixed inset-0 z-50 bg-[#050505]"
+              ? "fixed inset-0 z-50 bg-[var(--background-sidebar)]"
               : "hidden"
-          } xl:relative xl:flex w-full xl:w-[320px] border-l border-[rgba(255,255,255,0.06)] bg-[#050505] flex-col overflow-y-auto`}>
+          } xl:relative xl:flex w-full xl:w-[320px] border-l border-[var(--border-subtle)] bg-[var(--background-sidebar)] flex-col overflow-y-auto`}>
 
             {/* Mobile close */}
             {mobileCrmOpen && (
-              <div className="xl:hidden flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.06)]">
+              <div className="xl:hidden flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
                 <span className="text-sm font-medium text-[var(--text-primary)]">Contact</span>
                 <button onClick={() => setMobileCrmOpen(false)} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">
                   <X size={16} />
@@ -458,8 +506,8 @@ export default function ConversationPage() {
             )}
 
             {/* ── 5.1 Identity Header (Always Visible) ── */}
-            <div className="p-6 border-b border-[rgba(255,255,255,0.06)] flex flex-col items-center text-center">
-              <div className="h-16 w-16 rounded-full bg-zinc-800 flex items-center justify-center text-2xl text-[var(--text-secondary)] mt-2">
+            <div className="p-6 border-b border-[var(--border-subtle)] flex flex-col items-center text-center">
+              <div className="h-16 w-16 rounded-full bg-[var(--background-elevated)] flex items-center justify-center text-2xl text-[var(--text-secondary)] mt-2">
                 {getInitials(senderName)}
               </div>
               <p className="text-[var(--text-primary)] font-medium text-lg mt-4">
@@ -475,7 +523,7 @@ export default function ConversationPage() {
               <motion.div variants={linearFadeIn} initial="hidden" animate="visible">
                 {/* LTV Badge */}
                 {ltv > 0 && (
-                  <div className="bg-[rgba(34,197,94,0.1)] text-green-400 border border-green-500/20 rounded px-3 py-2 font-mono text-center mx-6 mt-4 text-sm">
+                  <div className="bg-[var(--status-success-bg)] text-[var(--status-success)] border border-[var(--status-success)]/20 rounded px-3 py-2 font-mono text-center mx-6 mt-4 text-sm">
                     LTV: ${ltv.toFixed(2)}
                   </div>
                 )}
@@ -489,10 +537,10 @@ export default function ConversationPage() {
                     {(shopifyOrders || []).map((order) => {
                       const isOExpanded = expandedOrder === order.id;
                       return (
-                        <div key={order.id} className="rounded-lg border border-[rgba(255,255,255,0.06)]">
+                        <div key={order.id} className="rounded-lg border border-[var(--border-subtle)]">
                           <button
                             onClick={() => setExpandedOrder(isOExpanded ? null : order.id)}
-                            className="flex items-center justify-between w-full p-3 text-left hover:bg-[rgba(255,255,255,0.04)] transition-colors"
+                            className="flex items-center justify-between w-full p-3 text-left hover:bg-[var(--surface-hover)] transition-colors"
                           >
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-mono text-[var(--text-primary)]">
@@ -516,7 +564,7 @@ export default function ConversationPage() {
                             </div>
                           </button>
                           {isOExpanded && (
-                            <div className="px-3 pb-3 border-t border-[rgba(255,255,255,0.06)]">
+                            <div className="px-3 pb-3 border-t border-[var(--border-subtle)]">
                               {order.line_items_summary && (
                                 <div className="pt-2 space-y-1">
                                   {(order.line_items_summary as Array<{ title: string; qty: number }>).map((item, i) => (
@@ -526,7 +574,7 @@ export default function ConversationPage() {
                                   ))}
                                 </div>
                               )}
-                              <div className="flex justify-between items-center mt-2 pt-2 border-t border-[rgba(255,255,255,0.06)]">
+                              <div className="flex justify-between items-center mt-2 pt-2 border-t border-[var(--border-subtle)]">
                                 <span className="text-xs font-mono text-[var(--text-primary)]">${order.total_price}</span>
                               </div>
                             </div>
@@ -539,10 +587,10 @@ export default function ConversationPage() {
 
                 {/* E-commerce actions */}
                 <div className="px-6 pb-4 mt-auto space-y-1">
-                  <button className="w-full flex items-center gap-3 h-8 px-3 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)] transition-colors">
+                  <button className="w-full flex items-center gap-3 h-8 px-3 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors">
                     <ClipboardCopy size={14} /> Copy Tracking Link
                   </button>
-                  <button className="w-full flex items-center gap-3 h-8 px-3 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)] transition-colors">
+                  <button className="w-full flex items-center gap-3 h-8 px-3 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors">
                     <ExternalLink size={14} /> Open in Shopify
                   </button>
                 </div>
@@ -578,12 +626,12 @@ export default function ConversationPage() {
                     {(contact?.tags as string[] || []).map((tag: string, i: number) => (
                       <span
                         key={i}
-                        className="inline-flex items-center gap-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[10px] text-[var(--text-secondary)] px-2 py-0.5 rounded-full"
+                        className="inline-flex items-center gap-1 bg-[var(--surface-hover)] border border-[var(--border-hover)] text-[10px] text-[var(--text-secondary)] px-2 py-0.5 rounded-full"
                       >
                         <Tag size={8} /> {tag}
                       </span>
                     ))}
-                    <button className="inline-flex items-center gap-1 text-[10px] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] px-2 py-0.5 rounded-full border border-dashed border-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)] transition-colors">
+                    <button className="inline-flex items-center gap-1 text-[10px] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] px-2 py-0.5 rounded-full border border-dashed border-[var(--border-hover)] hover:border-[var(--border-glow)] transition-colors">
                       <Plus size={8} /> Add tag
                     </button>
                   </div>
@@ -591,13 +639,13 @@ export default function ConversationPage() {
 
                 {/* Standard actions */}
                 <div className="px-6 pb-4 mt-auto space-y-1">
-                  <button className="w-full flex items-center gap-3 h-8 px-3 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)] transition-colors">
+                  <button className="w-full flex items-center gap-3 h-8 px-3 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors">
                     <Plus size={14} /> Create Task
                   </button>
-                  <button className="w-full flex items-center gap-3 h-8 px-3 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)] transition-colors">
+                  <button className="w-full flex items-center gap-3 h-8 px-3 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors">
                     <StickyNote size={14} /> Add Note
                   </button>
-                  <button className="w-full flex items-center gap-3 h-8 px-3 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)] transition-colors">
+                  <button className="w-full flex items-center gap-3 h-8 px-3 rounded-md text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors">
                     <Ban size={14} /> Block Sender
                   </button>
                 </div>
@@ -619,7 +667,7 @@ export default function ConversationPage() {
                   </p>
                 </div>
                 <div className="px-6 pb-6">
-                  <button className="w-full flex items-center justify-center gap-2 h-10 rounded-md border border-[rgba(255,255,255,0.1)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)] hover:border-[rgba(255,255,255,0.2)] transition-colors">
+                  <button className="w-full flex items-center justify-center gap-2 h-10 rounded-md border border-[var(--border-hover)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] hover:border-[var(--border-glow)] transition-colors">
                     <MailX size={16} />
                     Unsubscribe & Archive
                   </button>
@@ -638,8 +686,8 @@ export default function ConversationPage() {
             exit={{ opacity: 0, y: 16 }}
             className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-xl backdrop-blur-sm ${
               sendToast.type === "success"
-                ? "bg-green-500/10 border border-green-500/20 text-green-400"
-                : "bg-red-500/10 border border-red-500/20 text-red-400"
+                ? "bg-[var(--status-success-bg)] border border-[var(--status-success)]/20 text-[var(--status-success)]"
+                : "bg-[var(--status-error-bg)] border border-[var(--status-error)]/20 text-[var(--status-error)]"
             }`}
             onAnimationComplete={() => {
               if (sendToast.type === "success") return;

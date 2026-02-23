@@ -144,3 +144,124 @@ export interface IntegrationConnection {
   lastSyncedAt?: string;
   accountLabel?: string;
 }
+
+/* ═══════════════ Nexus Engine Types ═══════════════ */
+
+export type EmailIntent = "meeting_request" | "task_action" | "newsletter" | "general_inquiry" | "scheduling_confirmation" | "reschedule_request";
+
+export interface MeetingEntities {
+  participants: Array<{ name: string; email?: string }>;
+  suggestedTimeframe?: string;
+  duration?: number;
+  format?: "call" | "video" | "in_person" | "coffee";
+  location?: string;
+  subject?: string;
+}
+
+export interface TaskEntities {
+  title: string;
+  deadline?: string;
+  estimatedMinutes?: number;
+  attachments?: Array<{ name: string; url: string }>;
+  sourceThreadId?: string;
+}
+
+export interface SchedulingRules {
+  bufferMinutes: number;
+  noMeetingDays: number[];
+  workingHoursStart: string;
+  workingHoursEnd: string;
+  defaultMeetingDuration: number;
+  defaultVideoLink?: string;
+  focusTimeBlocks?: Array<{ dayOfWeek: number; start: string; end: string }>;
+  timezone: string;
+}
+
+export type PendingActionType = "send_scheduling_email" | "create_calendar_event" | "timebox_task" | "auto_reply" | "reschedule";
+
+export type PendingActionStatus = "pending" | "approved" | "rejected" | "executed";
+
+export interface PendingAction {
+  id: string;
+  type: PendingActionType;
+  status: PendingActionStatus;
+  summary: string;
+  details: {
+    threadId?: string;
+    draftText?: string;
+    calendarEvent?: {
+      title: string;
+      startTime: string;
+      endTime: string;
+      attendees?: string[];
+      conferenceUrl?: string;
+      location?: string;
+    };
+    task?: TaskEntities;
+  };
+  sourceThreadId?: string;
+  createdAt: string;
+  executedAt?: string;
+  auditReason: string;
+}
+
+export interface FreeBusySlot {
+  start: string;
+  end: string;
+  isBusy: boolean;
+  eventTitle?: string;
+}
+
+export interface DailyBriefing {
+  date: string;
+  meetingPreps: Array<{
+    eventTitle: string;
+    startTime: string;
+    attendees: string[];
+    relatedThreadIds: string[];
+    contextSummary: string;
+  }>;
+  triageActions: Array<{
+    threadId: string;
+    action: string;
+    reason: string;
+  }>;
+  focusBlocks: Array<{
+    title: string;
+    startTime: string;
+    endTime: string;
+    linkedTaskId?: string;
+    linkedThreadId?: string;
+  }>;
+  calendarDensity: { totalMeetings: number; totalHours: number; freeHours: number };
+  inboxSummary: { unread: number; urgent: number; needsReply: number; autoHandled: number };
+}
+
+export interface NexusClassification {
+  intent: EmailIntent;
+  confidence: number;
+  meetingEntities?: MeetingEntities;
+  taskEntities?: TaskEntities;
+  suggestedActions: Array<{
+    type: PendingActionType;
+    label: string;
+    description: string;
+  }>;
+}
+
+export interface CalendarEvent {
+  id: string;
+  userId: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  description?: string;
+  location?: string;
+  color?: string;
+  taskId?: string;
+  threadId?: string;
+  conferenceUrl?: string;
+  attendees?: Array<{ name: string; email: string; status: string }>;
+  createdBy?: "user" | "aiva";
+  sourceAction?: string;
+}

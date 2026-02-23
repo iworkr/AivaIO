@@ -31,6 +31,11 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-background text-primary`}
       >
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem('aiva-theme');if(t==='light'){document.documentElement.classList.add('light');document.documentElement.classList.remove('dark');}})();`,
+          }}
+        />
         {children}
       </body>
     </html>

@@ -6,8 +6,8 @@ import { getBrandIcon } from "@/components/icons/brand-icons";
 import type { EmailSummaryWidgetData } from "@/types";
 
 const priorityStyles: Record<string, string> = {
-  urgent: "bg-red-500/10 text-red-400",
-  high: "bg-amber-500/10 text-amber-400",
+  urgent: "bg-[var(--status-error-bg)] text-[var(--status-error)]",
+  high: "bg-[var(--status-warning-bg)] text-[var(--status-warning)]",
   medium: "",
   low: "",
 };
@@ -31,7 +31,7 @@ export function EmailSummaryTile({ data }: { data: EmailSummaryWidgetData["data"
   const BrandIcon = getBrandIcon(data.sender) || getBrandIcon(data.provider);
 
   return (
-    <div className="w-full bg-[#0A0A0A] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 flex flex-col gap-3 transition-colors hover:border-[rgba(255,255,255,0.15)] group">
+    <div className="w-full bg-[var(--background-elevated)] border border-[var(--border-default)] rounded-xl p-4 flex flex-col gap-3 transition-colors hover:border-[var(--border-glow)] group">
       {/* Header: Brand + Sender + Timestamp */}
       <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-2 min-w-0">
@@ -70,17 +70,17 @@ export function EmailSummaryTile({ data }: { data: EmailSummaryWidgetData["data"
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2 pt-3 mt-1 border-t border-[rgba(255,255,255,0.04)]">
+      <div className="flex items-center gap-2 pt-3 mt-1 border-t border-[var(--border-subtle)]">
         <button
           onClick={() => router.push(`/app/inbox/${data.threadId}`)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
         >
           <Maximize2 size={14} />
           Read Full
         </button>
         <button
           onClick={() => router.push(`/app/inbox/${data.threadId}`)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
         >
           <PenLine size={14} />
           Draft Reply

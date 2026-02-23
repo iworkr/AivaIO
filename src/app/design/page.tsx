@@ -8,6 +8,7 @@ import {
   CommandPalette, CommandItem, CommandGroup, DataRow, BentoCard,
 } from "@/components/ui";
 import { linearFadeIn, staggerContainer, staggerItem, viewportOnce } from "@/lib/animations";
+import { useTheme } from "@/hooks/use-theme";
 import {
   Inbox, Star, FileText, CheckCircle, Settings, Moon, Sun, Search, Mail,
   MessageSquare, ShoppingBag, Zap, ArrowRight, Shield, Clock, Sparkles,
@@ -34,13 +35,7 @@ export default function DesignSystemPage() {
   const [sliderVal, setSliderVal] = useState([85]);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [showToast, setShowToast] = useState(false);
-  const [isDark, setIsDark] = useState(true);
-
-  const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle("light");
-    document.documentElement.classList.toggle("dark");
-  };
+  const { isDark, toggleTheme } = useTheme();
 
   return (
     <div className="min-h-screen bg-[var(--background-main)]">

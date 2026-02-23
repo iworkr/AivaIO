@@ -79,7 +79,7 @@ export function GenerativeUI() {
 
               <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">
                 You land at Harry Reid Airport at 4:15 PM.
-                <span className="inline-flex items-center gap-1 mx-1 px-1.5 py-0.5 rounded-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[10px] text-[var(--text-tertiary)] cursor-pointer hover:border-[var(--border-glow)]">
+                <span className="inline-flex items-center gap-1 mx-1 px-1.5 py-0.5 rounded-full bg-[var(--surface-hover)] border border-[var(--border-hover)] text-[10px] text-[var(--text-tertiary)] cursor-pointer hover:border-[var(--border-glow)]">
                   G Oct 12
                 </span>
                 Check-in at the Bellagio is at 3:00 PM, so you&apos;ll have about an hour.

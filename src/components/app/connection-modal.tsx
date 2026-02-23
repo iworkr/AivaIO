@@ -40,7 +40,7 @@ export function ConnectionModal({ provider, onClose }: ConnectionModalProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-sm bg-black/60"
+        className="fixed inset-0 z-[100] flex items-center justify-center backdrop-blur-sm bg-[var(--background-main)]/60"
         onClick={onClose}
       >
         <motion.div
@@ -48,20 +48,20 @@ export function ConnectionModal({ provider, onClose }: ConnectionModalProps) {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          className="bg-[#0A0A0A] border border-[rgba(255,255,255,0.1)] rounded-2xl w-[400px] p-8 text-center"
+          className="bg-[var(--background-elevated)] border border-[var(--border-hover)] rounded-2xl w-[400px] p-8 text-center"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Animated linkage: AIVA <--> Integration */}
           <div className="flex items-center justify-center gap-6 mb-6">
-            <div className="size-12 rounded-xl bg-blue-500/10 flex items-center justify-center">
-              <Sparkles size={20} className="text-blue-400" />
+            <div className="size-12 rounded-xl bg-[var(--aiva-blue-glow)] flex items-center justify-center">
+              <Sparkles size={20} className="text-[var(--aiva-blue)]" />
             </div>
 
             <div className="flex items-center gap-1">
               {[0, 1, 2].map((i) => (
                 <motion.div
                   key={i}
-                  className="w-1.5 h-1.5 rounded-full bg-[rgba(255,255,255,0.2)]"
+                  className="w-1.5 h-1.5 rounded-full bg-[var(--border-glow)]"
                   animate={{
                     opacity: [0.2, 1, 0.2],
                     scale: [0.8, 1.2, 0.8],
@@ -75,7 +75,7 @@ export function ConnectionModal({ provider, onClose }: ConnectionModalProps) {
               ))}
             </div>
 
-            <div className="size-12 rounded-xl bg-[rgba(255,255,255,0.05)] flex items-center justify-center">
+            <div className="size-12 rounded-xl bg-[var(--surface-hover)] flex items-center justify-center">
               <BrandIcon size={24} />
             </div>
           </div>
@@ -87,9 +87,9 @@ export function ConnectionModal({ provider, onClose }: ConnectionModalProps) {
             You&apos;ll be redirected to securely authorize AIVA.
           </p>
 
-          <div className="mt-6 h-1 w-full rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
+          <div className="mt-6 h-1 w-full rounded-full bg-[var(--surface-hover)] overflow-hidden">
             <motion.div
-              className="h-full bg-blue-500/60 rounded-full"
+              className="h-full bg-[var(--aiva-blue)]/60 rounded-full"
               initial={{ width: "0%" }}
               animate={{ width: "100%" }}
               transition={{ duration: 1.2, ease: "linear" }}

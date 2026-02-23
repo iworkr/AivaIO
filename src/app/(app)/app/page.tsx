@@ -11,6 +11,8 @@ import { useSupabaseQuery } from "@/hooks/use-supabase-query";
 import { fetchThreads } from "@/lib/supabase/queries";
 import { AIResponseRenderer, ResearchingState } from "@/components/widgets";
 import { EmptyStateHook } from "@/components/app/empty-state-hook";
+import { NexusBriefing } from "@/components/app/nexus-briefing";
+import { PendingActionsQueue } from "@/components/app/pending-actions-queue";
 import type { AIResponse } from "@/types";
 import {
   ArrowUp, Paperclip, Mic, Sparkles,
@@ -60,8 +62,8 @@ function BriefingCard({
 }) {
   return (
     <motion.div
-      whileHover={{ y: -2, borderColor: "rgba(255,255,255,0.15)" }}
-      className="bg-[#0A0A0A] border border-[rgba(255,255,255,0.06)] rounded-2xl p-5 flex flex-col gap-3 min-w-[260px] flex-1 cursor-default transition-colors"
+      whileHover={{ y: -2, borderColor: "var(--border-glow)" }}
+      className="bg-[var(--background-elevated)] border border-[var(--border-subtle)] rounded-2xl p-5 flex flex-col gap-3 min-w-[260px] flex-1 cursor-default transition-colors"
     >
       <div className="flex items-center gap-2">
         <div className={`h-6 w-6 rounded-full flex items-center justify-center ${iconColor}`}>
@@ -72,7 +74,7 @@ function BriefingCard({
       <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{body}</p>
       <button
         onClick={onAction}
-        className="self-start text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] border border-[rgba(255,255,255,0.1)] rounded-md px-3 py-1.5 hover:border-[rgba(255,255,255,0.2)] hover:bg-[rgba(255,255,255,0.04)] transition-all"
+        className="self-start text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)] border border-[var(--border-hover)] rounded-md px-3 py-1.5 hover:border-[var(--border-glow)] hover:bg-[var(--surface-hover)] transition-all"
       >
         {action}
       </button>
@@ -94,22 +96,22 @@ const markdownComponents = {
     <li className="text-[15px] leading-relaxed text-[var(--text-primary)]" {...props}>{children}</li>
   ),
   strong: ({ children, ...props }: React.HTMLAttributes<HTMLElement>) => (
-    <strong className="font-semibold text-white" {...props}>{children}</strong>
+    <strong className="font-semibold text-[var(--text-primary)]" {...props}>{children}</strong>
   ),
   em: ({ children, ...props }: React.HTMLAttributes<HTMLElement>) => (
     <em className="italic text-[var(--text-secondary)]" {...props}>{children}</em>
   ),
   h3: ({ children, ...props }: React.HTMLAttributes<HTMLHeadingElement>) => (
-    <h3 className="text-sm font-semibold text-white mt-4 mb-2" {...props}>{children}</h3>
+    <h3 className="text-sm font-semibold text-[var(--text-primary)] mt-4 mb-2" {...props}>{children}</h3>
   ),
   code: ({ children, ...props }: React.HTMLAttributes<HTMLElement>) => (
-    <code className="text-[13px] font-mono bg-[rgba(255,255,255,0.06)] px-1.5 py-0.5 rounded text-[var(--text-secondary)]" {...props}>{children}</code>
+    <code className="text-[13px] font-mono bg-[var(--surface-hover)] px-1.5 py-0.5 rounded text-[var(--text-secondary)]" {...props}>{children}</code>
   ),
   blockquote: ({ children, ...props }: React.BlockquoteHTMLAttributes<HTMLQuoteElement>) => (
-    <blockquote className="border-l-2 border-[rgba(255,255,255,0.1)] pl-4 my-3 text-[var(--text-secondary)] italic" {...props}>{children}</blockquote>
+    <blockquote className="border-l-2 border-[var(--border-hover)] pl-4 my-3 text-[var(--text-secondary)] italic" {...props}>{children}</blockquote>
   ),
   hr: (props: React.HTMLAttributes<HTMLHRElement>) => (
-    <hr className="border-[rgba(255,255,255,0.06)] my-4" {...props} />
+    <hr className="border-[var(--border-subtle)] my-4" {...props} />
   ),
 };
 
@@ -119,7 +121,7 @@ function SlashPopup({ onSelect }: { onSelect: (cmd: string) => void }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 8 }}
-      className="absolute bottom-full mb-2 left-0 right-0 bg-[#0A0A0A] border border-[rgba(255,255,255,0.1)] rounded-xl backdrop-blur-md overflow-hidden z-50"
+      className="absolute bottom-full mb-2 left-0 right-0 bg-[var(--background-elevated)] border border-[var(--border-hover)] rounded-xl backdrop-blur-md overflow-hidden z-50"
     >
       {SLASH_COMMANDS.map((cmd) => {
         const Icon = cmd.icon;
@@ -127,7 +129,7 @@ function SlashPopup({ onSelect }: { onSelect: (cmd: string) => void }) {
           <button
             key={cmd.cmd}
             onClick={() => onSelect(cmd.cmd)}
-            className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-[rgba(255,255,255,0.04)] transition-colors"
+            className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-[var(--surface-hover)] transition-colors"
           >
             <Icon size={14} className="text-[var(--text-tertiary)]" />
             <span className="text-sm text-[var(--text-primary)] font-mono">{cmd.cmd}</span>
@@ -164,18 +166,18 @@ function InputBar({
 
   if (variant === "fixed") {
     return (
-      <div className="fixed bottom-0 left-[240px] right-0 h-32 bg-gradient-to-t from-black via-black/80 to-transparent pointer-events-none flex items-end justify-center pb-8 z-50">
+      <div className="fixed bottom-0 left-[240px] right-0 h-32 bg-gradient-to-t from-[var(--background-main)] via-[var(--background-main)]/80 to-transparent pointer-events-none flex items-end justify-center pb-8 z-50">
         <div className="w-full max-w-3xl px-4 pointer-events-auto">
           <div className="relative">
             <AnimatePresence>
               {showSlash && <SlashPopup onSelect={onSlashSelect} />}
             </AnimatePresence>
-            <div className={`flex items-center gap-3 bg-[#0A0A0A]/80 backdrop-blur-xl rounded-full px-4 py-3 transition-all duration-200 ${
+            <div className={`flex items-center gap-3 bg-[var(--background-elevated)]/80 backdrop-blur-xl rounded-full px-4 py-3 transition-all duration-200 ${
               focused
-                ? "border border-[rgba(59,130,246,0.5)] shadow-[0_0_20px_rgba(59,130,246,0.1)]"
-                : "border border-[rgba(255,255,255,0.1)]"
+                ? "border border-[var(--aiva-blue-ring)] shadow-[0_0_20px_var(--aiva-blue-glow)]"
+                : "border border-[var(--border-hover)]"
             }`}>
-              <Sparkles size={16} className="text-blue-400 brightness-125 shrink-0" />
+              <Sparkles size={16} className="text-[var(--aiva-blue)] brightness-125 shrink-0" />
               <input
                 ref={inputRef}
                 value={value}
@@ -200,8 +202,8 @@ function InputBar({
                   disabled={!value.trim() || disabled}
                   className={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${
                     value.trim() && !disabled
-                      ? "bg-blue-500 text-white shadow-[0_0_10px_rgba(59,130,246,0.3)]"
-                      : "bg-[rgba(255,255,255,0.05)] text-[var(--text-tertiary)]"
+                      ? "bg-[var(--aiva-blue)] text-white shadow-[0_0_10px_var(--aiva-blue-glow)]"
+                      : "bg-[var(--surface-hover)] text-[var(--text-tertiary)]"
                   }`}
                 >
                   <ArrowUp size={16} />
@@ -220,10 +222,10 @@ function InputBar({
         <AnimatePresence>
           {showSlash && <SlashPopup onSelect={onSlashSelect} />}
         </AnimatePresence>
-        <div className={`flex items-center gap-3 bg-[#0A0A0A] rounded-full px-4 py-3 transition-all duration-200 ${
+        <div className={`flex items-center gap-3 bg-[var(--background-elevated)] rounded-full px-4 py-3 transition-all duration-200 ${
           focused
-            ? "border border-[rgba(59,130,246,0.5)] shadow-[0_0_20px_rgba(59,130,246,0.1)]"
-            : "border border-[rgba(255,255,255,0.1)]"
+            ? "border border-[var(--aiva-blue-ring)] shadow-[0_0_20px_var(--aiva-blue-glow)]"
+            : "border border-[var(--border-hover)]"
         }`}>
           <Sparkles size={16} className="text-[var(--aiva-blue)] shrink-0" />
           <input
@@ -250,8 +252,8 @@ function InputBar({
               disabled={!value.trim() || disabled}
               className={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${
                 value.trim() && !disabled
-                  ? "bg-blue-500 text-white shadow-[0_0_10px_rgba(59,130,246,0.3)]"
-                  : "bg-[rgba(255,255,255,0.05)] text-[var(--text-tertiary)]"
+                  ? "bg-[var(--aiva-blue)] text-white shadow-[0_0_10px_var(--aiva-blue-glow)]"
+                  : "bg-[var(--surface-hover)] text-[var(--text-tertiary)]"
               }`}
             >
               <ArrowUp size={16} />
@@ -470,7 +472,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#000000] relative">
+    <div className="h-screen flex flex-col bg-[var(--background-main)] relative">
 
       <AnimatePresence mode="wait">
       {/* ═══════ BRIEFING STATE ═══════ */}
@@ -497,11 +499,22 @@ export default function DashboardPage() {
             </p>
           </motion.div>
 
+          {/* ═══════ NEXUS DAILY BRIEFING — Calendar + Inbox Cross-Reference ═══════ */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-4 mb-12"
+            className="w-full max-w-4xl mb-6"
+          >
+            <NexusBriefing onAskAiva={sendMessage} />
+          </motion.div>
+
+          {/* ═══════ QUICK ACTION CARDS ═══════ */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"
           >
             <BriefingCard
               icon={<FileText size={14} className="text-red-400" />}
@@ -518,9 +531,9 @@ export default function DashboardPage() {
             <BriefingCard
               icon={<Calendar size={14} className="text-blue-400" />}
               iconColor="bg-blue-500/10"
-              title="Calendar"
-              body="Your next meeting starts soon. Check your schedule."
-              action="View Schedule"
+              title="Schedule"
+              body="Ask AIVA to schedule meetings, block focus time, or check your availability."
+              action="What does my day look like?"
               onAction={() => sendMessage("What does my day look like?")}
             />
             <BriefingCard
@@ -531,6 +544,16 @@ export default function DashboardPage() {
               action="Draft a friendly bump"
               onAction={() => sendMessage("Who am I waiting on a reply from? Draft a follow-up.")}
             />
+          </motion.div>
+
+          {/* ═══════ PENDING AIVA ACTIONS QUEUE ═══════ */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full max-w-4xl mb-8"
+          >
+            <PendingActionsQueue />
           </motion.div>
 
           {!hasAnyConnection && (
@@ -559,7 +582,7 @@ export default function DashboardPage() {
                   <button
                     key={s.id}
                     onClick={() => loadSession(s)}
-                    className="group relative text-left bg-[#0A0A0A] border border-[rgba(255,255,255,0.06)] rounded-xl px-4 py-3 hover:border-[rgba(255,255,255,0.15)] transition-all"
+                    className="group relative text-left bg-[var(--background-elevated)] border border-[var(--border-subtle)] rounded-xl px-4 py-3 hover:border-[var(--border-glow)] transition-all"
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <MessageSquare size={12} className="text-[var(--text-tertiary)]" />
@@ -613,7 +636,7 @@ export default function DashboardPage() {
           className="flex-1 flex flex-col overflow-hidden"
         >
           {/* Chat Header */}
-          <div className="h-12 shrink-0 flex items-center justify-between px-6 border-b border-[rgba(255,255,255,0.04)]">
+          <div className="h-12 shrink-0 flex items-center justify-between px-6 border-b border-[var(--border-subtle)]">
             <span className="text-xs text-[var(--text-tertiary)] font-mono">
               {sessionId ? sessions.find((s) => s.id === sessionId)?.title || "Chat" : "New Chat"}
             </span>
@@ -634,17 +657,17 @@ export default function DashboardPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                  className="flex w-full gap-4 py-6 border-b border-[rgba(255,255,255,0.02)]"
+                  className="flex w-full gap-4 py-6 border-b border-[var(--border-subtle)]"
                 >
                   {/* Avatar Column */}
                   <div className="w-8 flex-shrink-0 flex flex-col items-center pt-1">
                     {msg.role === "user" ? (
-                      <div className="size-8 rounded-full bg-[rgba(255,255,255,0.05)] flex items-center justify-center text-xs font-medium text-[var(--text-secondary)]">
+                      <div className="size-8 rounded-full bg-[var(--surface-hover)] flex items-center justify-center text-xs font-medium text-[var(--text-secondary)]">
                         {userInitial}
                       </div>
                     ) : (
-                      <div className="size-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                        <Sparkles size={14} className="text-blue-400" />
+                      <div className="size-8 rounded-full bg-[var(--aiva-blue-glow)] flex items-center justify-center">
+                        <Sparkles size={14} className="text-[var(--aiva-blue)]" />
                       </div>
                     )}
                   </div>
@@ -652,7 +675,7 @@ export default function DashboardPage() {
                   {/* Content Column */}
                   <div className="flex-1 min-w-0 flex flex-col gap-3">
                     {msg.role === "user" ? (
-                      <p className="text-[15px] leading-relaxed text-[#F4F4F5]">
+                      <p className="text-[15px] leading-relaxed text-[var(--text-primary)]">
                         {msg.text}
                       </p>
                     ) : (
@@ -697,8 +720,8 @@ export default function DashboardPage() {
                   className="flex w-full gap-4 py-6"
                 >
                   <div className="w-8 flex-shrink-0 flex flex-col items-center pt-1">
-                    <div className="size-8 rounded-full bg-blue-500/10 flex items-center justify-center">
-                      <Sparkles size={14} className="text-blue-400" />
+                    <div className="size-8 rounded-full bg-[var(--aiva-blue-glow)] flex items-center justify-center">
+                      <Sparkles size={14} className="text-[var(--aiva-blue)]" />
                     </div>
                   </div>
                   <div className="flex-1 min-w-0 pt-1">
@@ -733,7 +756,7 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
-            className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-xl backdrop-blur-sm bg-red-500/10 border border-red-500/20 text-red-400"
+            className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-xl backdrop-blur-sm bg-[var(--status-error-bg)] border border-[var(--status-error)]/20 text-[var(--status-error)]"
           >
             {errorToast}
           </motion.div>

@@ -27,9 +27,9 @@ export function CitationPill({ source, label, snippet }: CitationPillProps) {
       <Popover.Trigger asChild>
         <button
           className="inline-flex items-center gap-1.5 ml-1 px-2 py-0.5 rounded-full cursor-pointer align-middle
-            bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.04)]
+            bg-[var(--surface-hover)] border border-[var(--border-subtle)]
             text-[11px] text-[var(--text-secondary)] font-mono
-            hover:bg-[rgba(255,255,255,0.1)] transition-colors duration-150"
+            hover:bg-[var(--surface-pill)] transition-colors duration-150"
         >
           <Icon size={12} className="opacity-50" />
           <span>{label}</span>
@@ -38,7 +38,7 @@ export function CitationPill({ source, label, snippet }: CitationPillProps) {
 
       <Popover.Portal>
         <Popover.Content
-          className="w-80 rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#0A0A0A] p-4 shadow-2xl z-50"
+          className="w-80 rounded-xl border border-[var(--border-default)] bg-[var(--background-elevated)] p-4 shadow-2xl z-50"
           sideOffset={6}
           align="start"
         >
@@ -54,7 +54,7 @@ export function CitationPill({ source, label, snippet }: CitationPillProps) {
           <button className="mt-3 text-[11px] text-[var(--aiva-blue)] hover:underline font-medium">
             Open full message →
           </button>
-          <Popover.Arrow className="fill-[#0A0A0A]" />
+          <Popover.Arrow className="fill-[var(--background-elevated)]" />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

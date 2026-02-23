@@ -84,7 +84,7 @@ function BentoCard({
     <div
       className={cn(
         "group relative overflow-hidden rounded-xl bg-[var(--background-elevated)] p-6 transition-colors duration-150",
-        "hover:bg-[rgba(255,255,255,0.02)]",
+        "hover:bg-[var(--surface-hover-subtle)]",
         className
       )}
       {...props}

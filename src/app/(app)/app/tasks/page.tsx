@@ -9,7 +9,9 @@ import {
   Plus, CheckSquare, Circle, CheckCircle2, ChevronRight, ChevronDown,
   Calendar as CalendarIcon, Clock, Trash2, GripVertical, X,
   Flag, AlertTriangle, Minus, Filter, ChevronLeft, MoreHorizontal,
+  Mail, PanelLeft,
 } from "lucide-react";
+import { InboxTriagePanel } from "@/components/app/inbox-triage-panel";
 
 /* ═══════════════════ Types ═══════════════════ */
 
@@ -41,6 +43,11 @@ interface CalendarEvent {
   color: string;
   task_id: string | null;
   tasks?: { id: string; title: string; status: string; priority: string } | null;
+  created_by?: "user" | "aiva";
+  source_thread_id?: string | null;
+  conference_url?: string | null;
+  attendees?: Array<{ name?: string; email: string }>;
+  description?: string;
 }
 
 type CalendarView = "day" | "week" | "month";
@@ -142,8 +149,11 @@ function TasksPageInner() {
   const [calendarView, setCalendarView] = useState<CalendarView>(initialView);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [editingTask, setEditingTask] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [showInboxPanel, setShowInboxPanel] = useState(false);
+  const [draggedThread, setDraggedThread] = useState<{ id: string; subject: string; snippet: string } | null>(null);
   const newTaskRef = useRef<HTMLInputElement>(null);
 
   const loadTasks = useCallback(async () => {
@@ -284,6 +294,49 @@ function TasksPageInner() {
     setCurrentDate(next);
   };
 
+  const handleInboxDrop = async (date: Date, hour?: number) => {
+    if (!draggedThread) return;
+    const startTime = new Date(date);
+    if (hour !== undefined) startTime.setHours(hour, 0, 0, 0);
+    else startTime.setHours(9, 0, 0, 0);
+    const endTime = new Date(startTime);
+    endTime.setHours(startTime.getHours() + 1);
+
+    try {
+      await fetch("/api/ai/nexus/timebox", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId: draggedThread.id,
+          taskTitle: draggedThread.subject || "Handle email",
+          estimatedMinutes: 60,
+        }),
+      });
+
+      await fetch("/api/calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `Focus: ${draggedThread.subject}`,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          color: "blue",
+          description: `Drag-and-drop scheduled from inbox thread`,
+          source_thread_id: draggedThread.id,
+          created_by: "aiva",
+        }),
+      });
+
+      setToast({ type: "success", message: `"${draggedThread.subject}" timeboxed on calendar` });
+      setTimeout(() => setToast(null), 4000);
+      loadEvents();
+    } catch {
+      setToast({ type: "error", message: "Failed to schedule from inbox" });
+      setTimeout(() => setToast(null), 4000);
+    }
+    setDraggedThread(null);
+  };
+
   const filteredTasks = tasks;
   const todoTasks = filteredTasks.filter((t) => t.status !== "completed" && t.status !== "cancelled");
   const doneTasks = filteredTasks.filter((t) => t.status === "completed");
@@ -301,6 +354,18 @@ function TasksPageInner() {
       {/* ═══ Header ═══ */}
       <div className="h-14 border-b border-[var(--border-subtle)] px-6 flex items-center gap-4 shrink-0">
         <h1 className="text-sm font-semibold text-[var(--text-primary)]">Tasks & Calendar</h1>
+        <button
+          onClick={() => setShowInboxPanel(!showInboxPanel)}
+          className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md transition-colors ${
+            showInboxPanel
+              ? "bg-[var(--aiva-blue-glow)] text-[var(--aiva-blue)] font-medium"
+              : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
+          }`}
+          title="Toggle inbox panel for drag-and-drop scheduling"
+        >
+          <Mail size={12} />
+          Inbox
+        </button>
         <div className="flex-1" />
         <div className="flex items-center gap-1">
           {STATUS_FILTERS.map((f) => (
@@ -309,7 +374,7 @@ function TasksPageInner() {
               onClick={() => setStatusFilter(f.key)}
               className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
                 statusFilter === f.key
-                  ? "bg-[rgba(255,255,255,0.1)] text-[var(--text-primary)] font-medium"
+                  ? "bg-[var(--surface-pill)] text-[var(--text-primary)] font-medium"
                   : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
               }`}
             >
@@ -321,6 +386,24 @@ function TasksPageInner() {
 
       {/* ═══ Split Screen ═══ */}
       <div className="flex-1 flex overflow-hidden">
+        {/* ── Inbox Triage Panel (Nexus Split View) ── */}
+        <AnimatePresence>
+          {showInboxPanel && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 280, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="border-r border-[var(--border-subtle)] flex flex-col shrink-0 overflow-hidden"
+            >
+              <InboxTriagePanel
+                onDragStart={(thread) => setDraggedThread({ id: thread.id, subject: thread.subject, snippet: thread.snippet })}
+                onDragEnd={() => setDraggedThread(null)}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* ── Left Panel: Task List ── */}
         <div className="w-[360px] border-r border-[var(--border-subtle)] flex flex-col shrink-0">
           {/* Add task button */}
@@ -340,7 +423,7 @@ function TasksPageInner() {
                     onChange={(e) => setNewTaskTitle(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") handleCreateTask(); if (e.key === "Escape") setShowNewTask(false); }}
                     placeholder="Task title…"
-                    className="w-full bg-transparent border border-[rgba(255,255,255,0.1)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:border-[var(--aiva-blue-border)] focus:outline-none"
+                    className="w-full bg-transparent border border-[var(--border-hover)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:border-[var(--aiva-blue-border)] focus:outline-none"
                   />
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1">
@@ -363,7 +446,7 @@ function TasksPageInner() {
                       type="date"
                       value={newTaskDue}
                       onChange={(e) => setNewTaskDue(e.target.value)}
-                      className="bg-transparent border border-[rgba(255,255,255,0.08)] rounded px-2 py-1 text-[10px] text-[var(--text-tertiary)] focus:outline-none"
+                      className="bg-transparent border border-[var(--border-default)] rounded px-2 py-1 text-[10px] text-[var(--text-tertiary)] focus:outline-none"
                     />
                     <div className="flex-1" />
                     <button onClick={() => setShowNewTask(false)} className="text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]">
@@ -384,7 +467,7 @@ function TasksPageInner() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   onClick={() => setShowNewTask(true)}
-                  className="w-full flex items-center gap-2 h-9 px-3 rounded-lg border border-dashed border-[rgba(255,255,255,0.1)] text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:border-[rgba(255,255,255,0.2)] transition-colors"
+                  className="w-full flex items-center gap-2 h-9 px-3 rounded-lg border border-dashed border-[var(--border-hover)] text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:border-[var(--border-glow)] transition-colors"
                 >
                   <Plus size={14} /> New Task
                 </motion.button>
@@ -420,7 +503,7 @@ function TasksPageInner() {
                 {doneTasks.length > 0 && (
                   <div className="border-t border-[var(--border-subtle)]">
                     <div className="px-4 py-2 flex items-center gap-2">
-                      <CheckCircle2 size={12} className="text-green-500/60" />
+                      <CheckCircle2 size={12} className="text-[var(--status-success)] opacity-60" />
                       <span className="text-[11px] font-medium text-[var(--text-tertiary)]">
                         Completed ({doneTasks.length})
                       </span>
@@ -468,14 +551,14 @@ function TasksPageInner() {
                   : currentDate.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
             </span>
             <div className="flex-1" />
-            <div className="flex items-center gap-0.5 bg-[rgba(255,255,255,0.04)] rounded-lg p-0.5">
+            <div className="flex items-center gap-0.5 bg-[var(--surface-hover)] rounded-lg p-0.5">
               {(["day", "week", "month"] as CalendarView[]).map((v) => (
                 <button
                   key={v}
                   onClick={() => setCalendarView(v)}
                   className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
                     calendarView === v
-                      ? "bg-[rgba(255,255,255,0.1)] text-[var(--text-primary)]"
+                      ? "bg-[var(--surface-pill)] text-[var(--text-primary)]"
                       : "text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
                   }`}
                 >
@@ -488,7 +571,14 @@ function TasksPageInner() {
           {/* Calendar content */}
           <div className="flex-1 overflow-auto">
             {calendarView === "month" ? (
-              <MonthView date={currentDate} events={events} draggedTask={draggedTask} onDrop={handleCalendarDrop} />
+              <MonthView
+                date={currentDate}
+                events={events}
+                draggedTask={draggedTask}
+                onDrop={handleCalendarDrop}
+                onInboxDrop={handleInboxDrop}
+                hasDraggedThread={!!draggedThread}
+              />
             ) : (
               <TimeGridView
                 view={calendarView}
@@ -496,6 +586,8 @@ function TasksPageInner() {
                 events={events}
                 draggedTask={draggedTask}
                 onDrop={handleCalendarDrop}
+                onInboxDrop={handleInboxDrop}
+                hasDraggedThread={!!draggedThread}
               />
             )}
           </div>
@@ -510,8 +602,8 @@ function TasksPageInner() {
             exit={{ opacity: 0, y: 16 }}
             className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-xl backdrop-blur-sm ${
               toast.type === "error"
-                ? "bg-red-500/10 border border-red-500/20 text-red-400"
-                : "bg-green-500/10 border border-green-500/20 text-green-400"
+                ? "bg-[var(--status-error-bg)] border border-[var(--status-error)]/20 text-[var(--status-error)]"
+                : "bg-[var(--status-success-bg)] border border-[var(--status-success)]/20 text-[var(--status-success)]"
             }`}
           >
             {toast.message}
@@ -635,12 +727,14 @@ function TaskRow({
 /* ═══════════════════ Month View ═══════════════════ */
 
 function MonthView({
-  date, events, draggedTask, onDrop,
+  date, events, draggedTask, onDrop, onInboxDrop, hasDraggedThread,
 }: {
   date: Date;
   events: CalendarEvent[];
   draggedTask: Task | null;
   onDrop: (task: Task, date: Date) => void;
+  onInboxDrop?: (date: Date) => void;
+  hasDraggedThread?: boolean;
 }) {
   const days = getMonthDays(date);
   const today = new Date();
@@ -664,12 +758,13 @@ function MonthView({
           return (
             <div
               key={i}
-              onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("bg-[rgba(59,130,246,0.05)]"); }}
-              onDragLeave={(e) => { e.currentTarget.classList.remove("bg-[rgba(59,130,246,0.05)]"); }}
+              onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("bg-[var(--surface-accent)]"); }}
+              onDragLeave={(e) => { e.currentTarget.classList.remove("bg-[var(--surface-accent)]"); }}
               onDrop={(e) => {
                 e.preventDefault();
-                e.currentTarget.classList.remove("bg-[rgba(59,130,246,0.05)]");
+                e.currentTarget.classList.remove("bg-[var(--surface-accent)]");
                 if (draggedTask) onDrop(draggedTask, day);
+                else if (hasDraggedThread && onInboxDrop) onInboxDrop(day);
               }}
               className="min-h-[80px] border-b border-r border-[var(--border-subtle)] p-1 transition-colors"
             >
@@ -706,13 +801,15 @@ function MonthView({
 /* ═══════════════════ Day/Week Time Grid ═══════════════════ */
 
 function TimeGridView({
-  view, date, events, draggedTask, onDrop,
+  view, date, events, draggedTask, onDrop, onInboxDrop, hasDraggedThread,
 }: {
   view: "day" | "week";
   date: Date;
   events: CalendarEvent[];
   draggedTask: Task | null;
   onDrop: (task: Task, date: Date, hour: number) => void;
+  onInboxDrop?: (date: Date, hour: number) => void;
+  hasDraggedThread?: boolean;
 }) {
   const days = view === "week" ? getWeekDays(date) : [date];
   const hours = getHours();
@@ -754,12 +851,13 @@ function TimeGridView({
             {hours.map((h) => (
               <div
                 key={h}
-                onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("bg-[rgba(59,130,246,0.05)]"); }}
-                onDragLeave={(e) => { e.currentTarget.classList.remove("bg-[rgba(59,130,246,0.05)]"); }}
+                onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add("bg-[var(--surface-accent)]"); }}
+                onDragLeave={(e) => { e.currentTarget.classList.remove("bg-[var(--surface-accent)]"); }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  e.currentTarget.classList.remove("bg-[rgba(59,130,246,0.05)]");
+                  e.currentTarget.classList.remove("bg-[var(--surface-accent)]");
                   if (draggedTask) onDrop(draggedTask, day, h);
+                  else if (hasDraggedThread && onInboxDrop) onInboxDrop(day, h);
                 }}
                 className="h-[60px] border-b border-[var(--border-subtle)] transition-colors"
               />
@@ -787,10 +885,12 @@ function TimeGridView({
               const top = 40 + startMinutes;
               const height = duration;
 
+              const isAivaCreated = ev.created_by === "aiva";
+
               return (
                 <div
                   key={ev.id}
-                  className={`absolute left-1 right-1 rounded-md px-2 py-1 text-xs overflow-hidden z-10 border-l-2 ${
+                  className={`absolute left-1 right-1 rounded-md px-2 py-1 text-xs overflow-hidden z-10 border-l-2 cursor-pointer hover:brightness-125 transition-all ${
                     ev.color === "red"
                       ? "bg-red-500/10 border-red-500 text-red-300"
                       : ev.color === "yellow"
@@ -798,12 +898,24 @@ function TimeGridView({
                         : "bg-blue-500/10 border-blue-500 text-blue-300"
                   }`}
                   style={{ top: `${top}px`, height: `${height}px` }}
+                  title={isAivaCreated ? `Scheduled by AIVA${ev.source_thread_id ? ` from email thread` : ""}` : undefined}
                 >
-                  <div className="font-medium truncate">{ev.title}</div>
+                  <div className="font-medium truncate flex items-center gap-1">
+                    {isAivaCreated && (
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--aiva-blue)] shrink-0" title="Created by AIVA" />
+                    )}
+                    {ev.title}
+                  </div>
                   <div className="text-[10px] opacity-70">
                     {start.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} –{" "}
                     {end.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
                   </div>
+                  {isAivaCreated && height >= 45 && (
+                    <div className="text-[9px] opacity-50 flex items-center gap-1 mt-0.5">
+                      ✦ AIVA
+                      {ev.source_thread_id && " · from inbox"}
+                    </div>
+                  )}
                 </div>
               );
             })}

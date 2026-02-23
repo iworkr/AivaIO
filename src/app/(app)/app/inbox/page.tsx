@@ -222,7 +222,7 @@ export default function InboxPage() {
               onClick={() => setActiveFilter(f)}
               className={`text-sm px-3 py-1 rounded-md transition-colors duration-150 ${
                 activeFilter === f
-                  ? "bg-[rgba(255,255,255,0.1)] text-[var(--text-primary)] font-medium"
+                  ? "bg-[var(--surface-pill)] text-[var(--text-primary)] font-medium"
                   : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               }`}
             >
@@ -296,7 +296,7 @@ export default function InboxPage() {
                     isSelected
                       ? "bg-[var(--surface-active)]"
                       : "hover:bg-[var(--surface-hover)]"
-                  } ${isChecked ? "bg-[rgba(59,130,246,0.06)]" : ""}`}
+                  } ${isChecked ? "bg-[var(--surface-accent)]" : ""}`}
                 >
                   {/* Col 0: Checkbox — 28px */}
                   <div
@@ -308,10 +308,10 @@ export default function InboxPage() {
                         className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                           isChecked
                             ? "bg-[var(--aiva-blue)] border-[var(--aiva-blue)]"
-                            : "border-[rgba(255,255,255,0.2)] hover:border-[rgba(255,255,255,0.4)]"
+                            : "border-[var(--border-glow)] hover:border-[var(--border-glow)]"
                         }`}
                       >
-                        {isChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+                        {isChecked && <Check size={12} className="text-[var(--text-primary)]" strokeWidth={3} />}
                       </div>
                     ) : (
                       <span className="w-4" />
@@ -397,7 +397,7 @@ export default function InboxPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 24 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl bg-[#0A0A0A] border border-[rgba(255,255,255,0.12)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl bg-[var(--background-elevated)] border border-[var(--border-hover)] shadow-[0_8px_32px_rgba(0,0,0,0.5)] backdrop-blur-xl"
           >
             <span className="text-sm font-medium text-[var(--text-primary)] mr-2 min-w-[80px]">
               {selectedIds.size} selected
@@ -405,7 +405,7 @@ export default function InboxPage() {
             <button
               onClick={handleBulkMarkRead}
               disabled={actionLoading}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors disabled:opacity-50"
             >
               <CheckCheck size={16} />
               Mark read
@@ -413,15 +413,15 @@ export default function InboxPage() {
             <button
               onClick={handleBulkArchive}
               disabled={actionLoading}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors disabled:opacity-50"
             >
               <Archive size={16} />
               Archive
             </button>
-            <div className="w-px h-6 bg-[rgba(255,255,255,0.08)]" />
+            <div className="w-px h-6 bg-[var(--border-default)]" />
             <button
               onClick={clearSelection}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] transition-colors"
             >
               <X size={16} />
               Clear

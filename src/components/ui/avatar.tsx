@@ -20,7 +20,7 @@ function Avatar({ src, alt, initials, size = "md", className, ...props }: Avatar
     <div
       className={cn(
         "relative inline-flex shrink-0 items-center justify-center rounded-full overflow-hidden",
-        "bg-[rgba(255,255,255,0.05)] text-[var(--text-primary)] font-medium",
+        "bg-[var(--surface-hover)] text-[var(--text-primary)] font-medium",
         sizeClasses[size],
         className
       )}

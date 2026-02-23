@@ -10,6 +10,7 @@ import { useIntegrations } from "@/hooks/use-integrations";
 import { useUnreadCount } from "@/hooks/use-unread-count";
 import { GmailIcon, SlackIcon, ShopifyIcon } from "@/components/icons/brand-icons";
 import { ConnectionModal } from "./connection-modal";
+import { ThemeToggle } from "./theme-toggle";
 import {
   Command, Inbox, CheckSquare, Calendar,
   Settings, Search, ChevronsUpDown,
@@ -52,21 +53,21 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Mobile toggle */}
       <button
         onClick={onToggle}
-        className="lg:hidden fixed top-4 left-4 z-50 h-9 w-9 rounded-lg border border-[var(--border-subtle)] bg-[#050505] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+        className="lg:hidden fixed top-4 left-4 z-50 h-9 w-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--background-sidebar)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
       >
         {collapsed ? <Menu size={16} /> : <X size={16} />}
       </button>
 
       <aside
         className={cn(
-          "fixed top-0 left-0 bottom-0 z-40 w-[240px] bg-[#050505] border-r border-[rgba(255,255,255,0.06)]",
+          "fixed top-0 left-0 bottom-0 z-40 w-[240px] bg-[var(--background-sidebar)] border-r border-[var(--border-subtle)]",
           "flex flex-col transition-transform duration-200",
           "lg:translate-x-0",
           collapsed ? "-translate-x-full" : "translate-x-0"
         )}
       >
         {/* ═══ Top: AIVA Brand & Workspace ═══ */}
-        <div className="h-[56px] px-4 flex items-center justify-between border-b border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.03)] cursor-pointer transition-colors">
+        <div className="h-[56px] px-4 flex items-center justify-between border-b border-[var(--border-subtle)] hover:bg-[var(--surface-hover-subtle)] cursor-pointer transition-colors">
           <div className="flex items-center min-w-0">
             <img src="/aiva-mark.svg" alt="AIVA" className="h-6 w-6 shrink-0" />
             <span className="ml-2 text-sm font-medium text-[var(--text-primary)] tracking-tight truncate">
@@ -93,8 +94,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   className={cn(
                     "h-[32px] rounded-md flex items-center px-2 group transition-colors duration-150",
                     isActive
-                      ? "bg-[rgba(255,255,255,0.08)] text-[var(--text-primary)] font-medium"
-                      : "text-[var(--text-secondary)] font-normal hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--text-primary)]"
+                      ? "bg-[var(--surface-active)] text-[var(--text-primary)] font-medium"
+                      : "text-[var(--text-secondary)] font-normal hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]"
                   )}
                 >
                   <Icon
@@ -106,7 +107,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   />
                   <span className="flex-1 text-sm truncate">{link.label}</span>
                   {link.badgeKey === "inbox" && unreadCount > 0 && (
-                    <span className="bg-blue-500/10 text-blue-400 text-[10px] font-mono px-1.5 rounded leading-none py-0.5">
+                    <span className="bg-[var(--surface-accent)] text-[var(--aiva-blue)] text-[10px] font-mono px-1.5 rounded leading-none py-0.5">
                       {unreadCount > 99 ? "99+" : unreadCount}
                     </span>
                   )}
@@ -134,7 +135,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                       key={int.id}
                       onMouseEnter={() => setHoveredIntegration(int.id)}
                       onMouseLeave={() => setHoveredIntegration(null)}
-                      className="h-[32px] rounded-md flex items-center px-2 group hover:bg-[rgba(255,255,255,0.04)] transition-colors cursor-default"
+                      className="h-[32px] rounded-md flex items-center px-2 group hover:bg-[var(--surface-hover)] transition-colors cursor-default"
                     >
                       <BrandIcon
                         size={16}
@@ -160,7 +161,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                             "size-2 rounded-full",
                             needsReauth
                               ? "bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.4)]"
-                              : "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]"
+                              : "bg-[var(--status-success)] shadow-[0_0_8px_var(--status-success-glow)]"
                           )}
                         />
                       )}
@@ -170,7 +171,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               ) : (
                 <button
                   onClick={() => setConnecting("gmail")}
-                  className="h-[32px] rounded-md flex items-center px-2 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.04)] transition-colors w-full"
+                  className="h-[32px] rounded-md flex items-center px-2 text-sm text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] transition-colors w-full"
                 >
                   <span className="text-[var(--text-tertiary)] mr-3">+</span>
                   Connect an integration
@@ -181,25 +182,26 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </nav>
 
         {/* ═══ Bottom: User & System ═══ */}
-        <div className="mt-auto pb-4 px-2 border-t border-[rgba(255,255,255,0.06)] pt-2 space-y-0.5">
+        <div className="mt-auto pb-4 px-2 border-t border-[var(--border-subtle)] pt-2 space-y-0.5">
+          <ThemeToggle />
           <Link
             href="/app/settings"
             className={cn(
               "h-[32px] rounded-md flex items-center px-2 text-sm transition-colors duration-150",
-              pathname === "/app/settings"
-                ? "bg-[rgba(255,255,255,0.08)] text-[var(--text-primary)] font-medium"
-                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)]"
+                pathname === "/app/settings"
+                ? "bg-[var(--surface-active)] text-[var(--text-primary)] font-medium"
+                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
             )}
           >
             <Settings size={16} className="shrink-0 mr-3 text-[var(--text-tertiary)]" />
             <span className="flex-1">Settings</span>
           </Link>
           <button
-            className="h-[32px] rounded-md flex items-center px-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.04)] transition-colors duration-150 w-full"
+            className="h-[32px] rounded-md flex items-center px-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors duration-150 w-full"
           >
             <Search size={16} className="shrink-0 mr-3 text-[var(--text-tertiary)]" />
             <span className="flex-1 text-left">Search</span>
-            <kbd className="text-[9px] font-mono text-[var(--text-tertiary)] bg-[rgba(255,255,255,0.04)] px-1.5 py-0.5 rounded">
+            <kbd className="text-[9px] font-mono text-[var(--text-tertiary)] bg-[var(--surface-hover)] px-1.5 py-0.5 rounded">
               ⌘K
             </kbd>
           </button>

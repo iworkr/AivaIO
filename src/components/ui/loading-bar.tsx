@@ -22,7 +22,7 @@ function LoadingBar() {
 
 function ProgressBar({ value }: { value: number }) {
   return (
-    <div className="h-[2px] w-full bg-[rgba(255,255,255,0.05)] overflow-hidden rounded-full">
+    <div className="h-[2px] w-full bg-[var(--surface-hover)] overflow-hidden rounded-full">
       <motion.div
         className="h-full bg-[var(--aiva-blue)]"
         initial={{ width: 0 }}

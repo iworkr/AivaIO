@@ -15,12 +15,13 @@ import {
   User, Link2, Sliders, Shield, CreditCard, Lock,
   Mail, Hash, Phone, ShoppingBag, RefreshCw,
   ShieldAlert, Clock, DollarSign, Zap, AlertTriangle, FileText,
-  ChevronDown,
+  ChevronDown, Calendar, Sparkles,
 } from "lucide-react";
 
 const settingsSections = [
   { id: "profile", icon: User, label: "Profile" },
   { id: "integrations", icon: Link2, label: "Integrations" },
+  { id: "nexus", icon: Calendar, label: "Nexus Scheduling" },
   { id: "tone", icon: Sliders, label: "Tone Calibration" },
   { id: "vault", icon: Shield, label: "Safety Vault" },
   { id: "billing", icon: CreditCard, label: "Billing" },
@@ -60,6 +61,16 @@ export default function SettingsPage() {
   const [afterHours, setAfterHours] = useState(false);
   const [isRecalibrating, setIsRecalibrating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Nexus Scheduling state
+  const [bufferMinutes, setBufferMinutes] = useState([15]);
+  const [workingStart, setWorkingStart] = useState("09:00");
+  const [workingEnd, setWorkingEnd] = useState("17:00");
+  const [defaultDuration, setDefaultDuration] = useState([30]);
+  const [defaultVideoLink, setDefaultVideoLink] = useState("");
+  const [noMeetingDays, setNoMeetingDays] = useState<number[]>([]);
+  const [autonomousMode, setAutonomousMode] = useState(false);
+  const [nexusSaving, setNexusSaving] = useState(false);
 
   useEffect(() => {
     if (profile?.display_name) setName(profile.display_name);
@@ -267,6 +278,165 @@ export default function SettingsPage() {
                     </div>
                   );
                 })}
+              </motion.div>
+            </motion.div>
+          )}
+
+          {activeSection === "nexus" && (
+            <motion.div variants={staggerContainer} initial="hidden" animate="visible">
+              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-2">
+                Nexus Scheduling
+              </motion.h2>
+              <motion.p variants={staggerItem} className="text-sm text-[var(--text-tertiary)] mb-6">
+                Configure how AIVA manages your calendar and handles meeting requests.
+              </motion.p>
+
+              <motion.div variants={staggerItem} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background-elevated)] p-8 mb-6">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+                  <Clock size={14} className="text-[var(--aiva-blue)]" />
+                  Scheduling Rules
+                </h3>
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-xs font-medium text-[var(--text-secondary)] mb-2 block">
+                      Buffer Between Meetings: {bufferMinutes[0]} min
+                    </label>
+                    <Slider
+                      value={bufferMinutes}
+                      onValueChange={setBufferMinutes}
+                      min={0}
+                      max={60}
+                      step={5}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-[var(--text-secondary)] mb-2 block">
+                      Default Meeting Duration: {defaultDuration[0]} min
+                    </label>
+                    <Slider
+                      value={defaultDuration}
+                      onValueChange={setDefaultDuration}
+                      min={15}
+                      max={120}
+                      step={15}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-medium text-[var(--text-secondary)] mb-2 block">Working Hours Start</label>
+                      <input
+                        type="time"
+                        value={workingStart}
+                        onChange={(e) => setWorkingStart(e.target.value)}
+                        className="w-full bg-transparent border border-[var(--border-hover)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--aiva-blue-border)] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-[var(--text-secondary)] mb-2 block">Working Hours End</label>
+                      <input
+                        type="time"
+                        value={workingEnd}
+                        onChange={(e) => setWorkingEnd(e.target.value)}
+                        className="w-full bg-transparent border border-[var(--border-hover)] rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] focus:border-[var(--aiva-blue-border)] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-[var(--text-secondary)] mb-2 block">Default Video Link</label>
+                    <Input
+                      value={defaultVideoLink}
+                      onChange={(e) => setDefaultVideoLink(e.target.value)}
+                      placeholder="https://zoom.us/j/... or https://meet.google.com/..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-[var(--text-secondary)] mb-3 block">
+                      No-Meeting Days
+                    </label>
+                    <div className="flex items-center gap-2">
+                      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day, i) => {
+                        const dayNum = i + 1 === 7 ? 0 : i + 1;
+                        const isSelected = noMeetingDays.includes(dayNum);
+                        return (
+                          <button
+                            key={day}
+                            onClick={() => {
+                              setNoMeetingDays((prev) =>
+                                isSelected ? prev.filter((d) => d !== dayNum) : [...prev, dayNum]
+                              );
+                            }}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                              isSelected
+                                ? "bg-[var(--aiva-blue)] text-white"
+                                : "bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:bg-[var(--surface-pill)]"
+                            }`}
+                          >
+                            {day}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+
+              <motion.div variants={staggerItem} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background-elevated)] p-8 mb-6">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+                  <Sparkles size={14} className="text-[var(--aiva-blue)]" />
+                  Autonomy Level
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-[var(--text-primary)] font-medium">Fully Autonomous Mode</p>
+                      <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+                        When enabled, AIVA will execute scheduling actions without waiting for approval.
+                      </p>
+                    </div>
+                    <ToggleSwitch checked={autonomousMode} onCheckedChange={setAutonomousMode} />
+                  </div>
+                  {autonomousMode && (
+                    <div className="bg-[var(--status-warning-bg)] border border-[var(--status-warning)]/20 rounded-lg p-3">
+                      <p className="text-xs text-[var(--status-warning)] flex items-center gap-2">
+                        <AlertTriangle size={12} />
+                        AIVA will send emails and create events on your behalf without asking.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+
+              <motion.div variants={staggerItem} className="flex justify-end">
+                <Button
+                  onClick={async () => {
+                    setNexusSaving(true);
+                    try {
+                      const res = await fetch("/api/ai/nexus/pending-actions", { method: "GET" });
+                      // Save scheduling rules via workspace settings
+                      if (workspaceId) {
+                        await updateWorkspaceSettings(workspaceId, {
+                          scheduling_rules: {
+                            bufferMinutes: bufferMinutes[0],
+                            noMeetingDays,
+                            workingHoursStart: workingStart,
+                            workingHoursEnd: workingEnd,
+                            defaultMeetingDuration: defaultDuration[0],
+                            defaultVideoLink: defaultVideoLink || undefined,
+                            autonomousMode,
+                          },
+                        });
+                      }
+                    } catch { /* ignore */ }
+                    setNexusSaving(false);
+                  }}
+                  disabled={nexusSaving}
+                >
+                  {nexusSaving ? "Saving…" : "Save Scheduling Rules"}
+                </Button>
               </motion.div>
             </motion.div>
           )}

@@ -1,11 +1,11 @@
 import type { FlightWidgetData } from "@/types";
 
 const statusColors: Record<string, { bg: string; text: string }> = {
-  ON_TIME: { bg: "rgba(34, 197, 94, 0.1)", text: "#4ADE80" },
-  DELAYED: { bg: "rgba(251, 191, 36, 0.1)", text: "#FBBF24" },
-  CANCELLED: { bg: "rgba(239, 68, 68, 0.1)", text: "#F87171" },
-  BOARDING: { bg: "rgba(59, 130, 246, 0.1)", text: "#3B82F6" },
-  LANDED: { bg: "rgba(34, 197, 94, 0.1)", text: "#4ADE80" },
+  ON_TIME: { bg: "var(--status-success-bg)", text: "var(--status-success)" },
+  DELAYED: { bg: "var(--status-warning-bg)", text: "var(--status-warning)" },
+  CANCELLED: { bg: "var(--status-error-bg)", text: "var(--status-error)" },
+  BOARDING: { bg: "var(--aiva-blue-glow)", text: "var(--aiva-blue)" },
+  LANDED: { bg: "var(--status-success-bg)", text: "var(--status-success)" },
 };
 
 export function FlightWidget({ data }: { data: FlightWidgetData["data"] }) {

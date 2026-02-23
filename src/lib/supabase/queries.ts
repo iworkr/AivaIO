@@ -330,6 +330,44 @@ export async function deleteCalendarEvent(eventId: string) {
   if (error) throw error;
 }
 
+/* ════════════ Nexus / Pending Actions ════════════ */
+
+export async function fetchPendingActions(userId: string) {
+  const { data, error } = await supabase
+    .from("aiva_pending_actions")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function fetchSchedulingRules(userId: string) {
+  const { data, error } = await supabase
+    .from("workspace_settings")
+    .select("scheduling_rules")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.scheduling_rules || null;
+}
+
+export async function updateSchedulingRules(userId: string, rules: Record<string, unknown>) {
+  const { error } = await supabase
+    .from("workspace_settings")
+    .upsert({
+      user_id: userId,
+      scheduling_rules: rules,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "user_id" });
+
+  if (error) throw error;
+}
+
 /* ════════════ Thread Helpers ════════════ */
 
 function mapThread(row: Record<string, unknown>): Thread {

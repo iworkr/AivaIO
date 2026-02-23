@@ -49,10 +49,10 @@ export function EmptyStateHook({ type, contactName }: EmptyStateHookProps) {
                 return (
                   <motion.button
                     key={int.id}
-                    whileHover={{ y: -2, borderColor: "rgba(255,255,255,0.2)" }}
+                    whileHover={{ y: -2, borderColor: "var(--border-glow)" }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => setConnecting(int.id)}
-                    className="bg-[#0A0A0A] border border-[rgba(255,255,255,0.08)] rounded-xl p-5 flex flex-col items-center gap-3 hover:bg-[rgba(255,255,255,0.02)] cursor-pointer transition-all"
+                    className="bg-[var(--background-elevated)] border border-[var(--border-default)] rounded-xl p-5 flex flex-col items-center gap-3 hover:bg-[var(--surface-hover-subtle)] cursor-pointer transition-all"
                   >
                     <Icon size={28} />
                     <span className="text-sm font-medium text-[var(--text-primary)]">
@@ -75,7 +75,7 @@ export function EmptyStateHook({ type, contactName }: EmptyStateHookProps) {
   if (type === "CHAT") {
     return (
       <>
-        <div className="w-full bg-[#0A0A0A] border border-[rgba(255,255,255,0.08)] rounded-xl p-5">
+        <div className="w-full bg-[var(--background-elevated)] border border-[var(--border-default)] rounded-xl p-5">
           <p className="text-sm text-[var(--text-secondary)] mb-4">
             I don&apos;t have access to your messages yet. Connect a channel below so I can start working for you.
           </p>
@@ -86,7 +86,7 @@ export function EmptyStateHook({ type, contactName }: EmptyStateHookProps) {
                 <button
                   key={int.id}
                   onClick={() => setConnecting(int.id)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[rgba(255,255,255,0.1)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.2)] hover:bg-[rgba(255,255,255,0.03)] transition-all"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[var(--border-hover)] text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-glow)] hover:bg-[var(--surface-hover-subtle)] transition-all"
                 >
                   <Icon size={16} />
                   <span>{int.name}</span>
@@ -103,9 +103,9 @@ export function EmptyStateHook({ type, contactName }: EmptyStateHookProps) {
   if (type === "CRM") {
     return (
       <>
-        <div className="p-4 border border-[rgba(255,255,255,0.08)] rounded-xl bg-[#0A0A0A]">
+        <div className="p-4 border border-[var(--border-default)] rounded-xl bg-[var(--background-elevated)]">
           <div className="flex items-center gap-3 mb-3">
-            <div className="size-8 rounded-lg bg-[rgba(255,255,255,0.04)] flex items-center justify-center">
+            <div className="size-8 rounded-lg bg-[var(--surface-hover)] flex items-center justify-center">
               <ShopifyIcon size={16} className="grayscale opacity-60" />
             </div>
             <span className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider">
@@ -119,7 +119,7 @@ export function EmptyStateHook({ type, contactName }: EmptyStateHookProps) {
           </p>
           <button
             onClick={() => setConnecting("shopify")}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.1)] text-sm font-medium text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.1)] hover:border-[rgba(255,255,255,0.2)] transition-all"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--surface-hover)] border border-[var(--border-hover)] text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--surface-pill)] hover:border-[var(--border-glow)] transition-all"
           >
             <ShoppingBag size={14} />
             Connect Shopify
@@ -135,7 +135,7 @@ export function EmptyStateHook({ type, contactName }: EmptyStateHookProps) {
 
 export function InlineIntegrationCard({ onConnect }: { onConnect: (provider: string) => void }) {
   return (
-    <div className="w-full bg-[#0A0A0A] border border-[rgba(255,255,255,0.08)] rounded-xl p-4 flex flex-col gap-3">
+    <div className="w-full bg-[var(--background-elevated)] border border-[var(--border-default)] rounded-xl p-4 flex flex-col gap-3">
       <p className="text-sm text-[var(--text-secondary)]">
         Connect a channel so I can search your data.
       </p>
@@ -146,7 +146,7 @@ export function InlineIntegrationCard({ onConnect }: { onConnect: (provider: str
             <button
               key={int.id}
               onClick={() => onConnect(int.id)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-[rgba(255,255,255,0.08)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.03)] transition-all"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-[var(--border-default)] text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border-glow)] hover:bg-[var(--surface-hover-subtle)] transition-all"
             >
               <Icon size={14} />
               {int.name}

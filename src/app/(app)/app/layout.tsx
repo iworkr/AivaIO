@@ -6,7 +6,7 @@ import { Sidebar } from "@/components/app/sidebar";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { LearningToast } from "@/components/app/learning-toast";
 import { Toast, CommandPalette, CommandItem, CommandGroup } from "@/components/ui";
-import { Home, Inbox, Star, FileText, Settings, Zap, Clock, Shield, CheckCircle, CheckSquare } from "lucide-react";
+import { Home, Inbox, Star, FileText, Settings, Zap, Clock, Shield, CheckCircle, CheckSquare, Calendar, Sparkles } from "lucide-react";
 
 function IntegrationSuccessDetector({ onSuccess }: { onSuccess: (msg: string) => void }) {
   const searchParams = useSearchParams();
@@ -72,6 +72,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </CommandItem>
           <CommandItem icon={<Shield size={14} />} onClick={() => { router.push("/app/audit"); setCmdOpen(false); }}>
             Audit Log
+          </CommandItem>
+        </CommandGroup>
+        <CommandGroup label="Nexus Actions">
+          <CommandItem icon={<Calendar size={14} />} onClick={() => { router.push("/app/tasks?view=week"); setCmdOpen(false); }}>
+            Open Calendar
+          </CommandItem>
+          <CommandItem icon={<Sparkles size={14} />} onClick={() => { router.push("/app/settings?section=nexus"); setCmdOpen(false); }}>
+            Scheduling Rules
           </CommandItem>
         </CommandGroup>
         <CommandGroup label="Actions">
