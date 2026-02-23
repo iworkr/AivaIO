@@ -15,8 +15,11 @@ import {
   User, Link2, Sliders, Shield, CreditCard, Lock,
   Mail, Hash, Phone, ShoppingBag, RefreshCw,
   ShieldAlert, Clock, DollarSign, Zap, AlertTriangle, FileText,
-  ChevronDown, Calendar, Sparkles,
+  ChevronDown, Calendar, Sparkles, CheckCircle, ExternalLink, Star,
 } from "lucide-react";
+import { useSubscription } from "@/hooks/use-subscription";
+import { UpgradeModal } from "@/components/app/upgrade-modal";
+import { ProGate } from "@/components/app/pro-gate";
 
 const settingsSections = [
   { id: "profile", icon: User, label: "Profile" },
@@ -71,6 +74,11 @@ export default function SettingsPage() {
   const [noMeetingDays, setNoMeetingDays] = useState<number[]>([]);
   const [autonomousMode, setAutonomousMode] = useState(false);
   const [nexusSaving, setNexusSaving] = useState(false);
+
+  // Billing state
+  const { subscription, isPro, loading: subLoading, refresh: refreshSub } = useSubscription();
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   useEffect(() => {
     if (profile?.display_name) setName(profile.display_name);
@@ -131,21 +139,37 @@ export default function SettingsPage() {
   };
 
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   const handleConnect = async (provider: string) => {
     setConnectingProvider(provider);
+    setConnectError(null);
     try {
       const res = await fetch("/api/integrations/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Connection failed (${res.status})`);
+      }
+
       const data = await res.json();
       if (data.authUrl) {
         window.location.href = data.authUrl;
+      } else {
+        throw new Error("No authorization URL received");
       }
-    } catch {
+    } catch (err) {
+      setConnectError(
+        err instanceof Error
+          ? err.message
+          : "We couldn't connect right now. Please try again."
+      );
       setConnectingProvider(null);
+      setTimeout(() => setConnectError(null), 5000);
     }
   };
 
@@ -248,6 +272,14 @@ export default function SettingsPage() {
           {activeSection === "integrations" && (
             <motion.div variants={staggerContainer} initial="hidden" animate="visible">
               <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">Integrations</motion.h2>
+              {connectError && (
+                <motion.div
+                  variants={staggerItem}
+                  className="mb-4 rounded-lg bg-[var(--status-error-bg)] border border-[var(--status-error)]/20 px-4 py-3"
+                >
+                  <p className="text-xs text-[var(--status-error)]">{connectError}</p>
+                </motion.div>
+              )}
               <motion.div variants={staggerItem} className="space-y-3">
                 {connectionList.map(({ provider, name: provName, desc, status, detail }) => {
                   const Icon = integrationIcons[provider] || Mail;
@@ -384,31 +416,33 @@ export default function SettingsPage() {
                 </div>
               </motion.div>
 
-              <motion.div variants={staggerItem} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background-elevated)] p-8 mb-6">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
-                  <Sparkles size={14} className="text-[var(--aiva-blue)]" />
-                  Autonomy Level
-                </h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-[var(--text-primary)] font-medium">Fully Autonomous Mode</p>
-                      <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
-                        When enabled, AIVA will execute scheduling actions without waiting for approval.
-                      </p>
+              <ProGate feature="autonomous_mode" mode="blur">
+                <motion.div variants={staggerItem} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background-elevated)] p-8 mb-6">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+                    <Sparkles size={14} className="text-[var(--aiva-blue)]" />
+                    Autonomy Level
+                  </h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-[var(--text-primary)] font-medium">Fully Autonomous Mode</p>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+                          When enabled, AIVA will execute scheduling actions without waiting for approval.
+                        </p>
+                      </div>
+                      <ToggleSwitch checked={autonomousMode} onCheckedChange={setAutonomousMode} />
                     </div>
-                    <ToggleSwitch checked={autonomousMode} onCheckedChange={setAutonomousMode} />
+                    {autonomousMode && (
+                      <div className="bg-[var(--status-warning-bg)] border border-[var(--status-warning)]/20 rounded-lg p-3">
+                        <p className="text-xs text-[var(--status-warning)] flex items-center gap-2">
+                          <AlertTriangle size={12} />
+                          AIVA will send emails and create events on your behalf without asking.
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  {autonomousMode && (
-                    <div className="bg-[var(--status-warning-bg)] border border-[var(--status-warning)]/20 rounded-lg p-3">
-                      <p className="text-xs text-[var(--status-warning)] flex items-center gap-2">
-                        <AlertTriangle size={12} />
-                        AIVA will send emails and create events on your behalf without asking.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
+                </motion.div>
+              </ProGate>
 
               <motion.div variants={staggerItem} className="flex justify-end">
                 <Button
@@ -545,19 +579,167 @@ export default function SettingsPage() {
 
           {activeSection === "billing" && (
             <motion.div variants={staggerContainer} initial="hidden" animate="visible">
-              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">Billing</motion.h2>
-              <motion.div variants={staggerItem} className="rounded-xl border border-[var(--aiva-blue-border)] bg-[var(--background-elevated)] p-6">
+              <motion.h2 variants={staggerItem} className="text-xl font-semibold text-[var(--text-primary)] tracking-[-0.02em] mb-6">
+                Billing & Subscription
+              </motion.h2>
+
+              {/* Current Plan Card */}
+              <motion.div variants={staggerItem} className={`rounded-xl border bg-[var(--background-elevated)] p-6 mb-6 ${
+                isPro ? "border-[var(--aiva-blue-border)]" : "border-[var(--border-subtle)]"
+              }`}>
                 <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-lg font-semibold text-[var(--text-primary)]">Free Plan</p>
-                    <p className="text-sm text-[var(--text-secondary)]">$0/month</p>
+                  <div className="flex items-center gap-3">
+                    {isPro ? (
+                      <div className="h-10 w-10 rounded-lg bg-[var(--aiva-blue-glow)] flex items-center justify-center">
+                        <Sparkles size={18} className="text-[var(--aiva-blue)]" />
+                      </div>
+                    ) : (
+                      <div className="h-10 w-10 rounded-lg bg-[var(--surface-hover)] flex items-center justify-center">
+                        <Zap size={18} className="text-[var(--text-tertiary)]" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-lg font-semibold text-[var(--text-primary)]">
+                        {isPro ? "Aiva Pro" : "Aiva Basic"}
+                      </p>
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        {isPro
+                          ? subscription.billingInterval === "annual" ? "$99/year" : "$12/month"
+                          : "Free"
+                        }
+                      </p>
+                    </div>
                   </div>
-                  <Badge variant="blue">Active</Badge>
+                  <Badge variant={isPro ? "blue" : "default"}>
+                    {isPro ? "Pro" : "Free"}
+                  </Badge>
                 </div>
-                <ProgressBar value={0} />
-                <p className="text-xs text-[var(--text-tertiary)] mt-1">0 / 100 AI drafts used this month</p>
-                <p className="text-xs text-[var(--text-tertiary)] mt-3">Upgrade to unlock unlimited AI drafts, priority support, and advanced integrations.</p>
+
+                {isPro && subscription.currentPeriodEnd && (
+                  <div className="text-xs text-[var(--text-tertiary)] mb-4">
+                    {subscription.cancelAtPeriodEnd ? (
+                      <span className="text-[var(--status-warning)]">
+                        Cancels on {new Date(subscription.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                      </span>
+                    ) : (
+                      <span>
+                        Next billing: {new Date(subscription.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {isPro && subscription.paymentFailed && (
+                  <div className="bg-[var(--status-error-bg)] border border-[var(--status-error)]/20 rounded-lg p-3 mb-4">
+                    <p className="text-xs text-[var(--status-error)] flex items-center gap-2 font-medium">
+                      <AlertTriangle size={12} />
+                      Payment failed. Please update your payment method to keep Pro access.
+                    </p>
+                    {subscription.graceDeadline && (
+                      <p className="text-[10px] text-[var(--status-error)]/70 mt-1">
+                        Pro access expires {new Date(subscription.graceDeadline).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {isPro ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={async () => {
+                          setPortalLoading(true);
+                          try {
+                            const res = await fetch("/api/stripe/portal", { method: "POST" });
+                            const data = await res.json();
+                            if (data.url) window.location.href = data.url;
+                          } catch { /* ignore */ }
+                          setPortalLoading(false);
+                        }}
+                        disabled={portalLoading}
+                      >
+                        <ExternalLink size={12} />
+                        {portalLoading ? "Loading…" : "Manage Subscription"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={async () => {
+                          setPortalLoading(true);
+                          try {
+                            const res = await fetch("/api/stripe/portal", { method: "POST" });
+                            const data = await res.json();
+                            if (data.url) window.location.href = data.url;
+                          } catch { /* ignore */ }
+                          setPortalLoading(false);
+                        }}
+                      >
+                        <CreditCard size={12} />
+                        Update Payment Method
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      {[
+                        "Autonomous meeting scheduling",
+                        "AI email-to-task timeboxing",
+                        "Daily synthesis briefing",
+                        "Unlimited calendar accounts",
+                        "Unlimited AI drafts",
+                      ].map((feat) => (
+                        <div key={feat} className="flex items-center gap-2">
+                          <CheckCircle size={12} className="text-[var(--text-tertiary)]" />
+                          <span className="text-xs text-[var(--text-secondary)]">{feat}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      variant="primary"
+                      size="md"
+                      onClick={() => setShowUpgradeModal(true)}
+                      className="w-full"
+                    >
+                      <Zap size={14} />
+                      Upgrade to Aiva Pro — 7 Day Free Trial
+                    </Button>
+                    <p className="text-[10px] text-[var(--text-tertiary)] text-center">
+                      Starting at $0.27/day. Cancel anytime.
+                    </p>
+                  </div>
+                )}
               </motion.div>
+
+              {/* Feature Comparison */}
+              <motion.div variants={staggerItem} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--background-elevated)] overflow-hidden">
+                <div className="px-6 py-4 border-b border-[var(--border-subtle)]">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">Feature Comparison</h3>
+                </div>
+                <div className="divide-y divide-[var(--border-subtle)]">
+                  {[
+                    { feature: "Calendar Sync", free: "1 Account", pro: "Unlimited" },
+                    { feature: "Task Management", free: "Unlimited", pro: "Unlimited + Subtasks" },
+                    { feature: "Email-to-Task", free: "Manual drag-and-drop", pro: "AI auto-scheduling" },
+                    { feature: "Meeting Negotiation", free: "—", pro: "Nexus Engine" },
+                    { feature: "Daily Briefing", free: "—", pro: "Included" },
+                    { feature: "AI Drafts", free: "100 / month", pro: "Unlimited" },
+                  ].map(({ feature, free, pro }) => (
+                    <div key={feature} className="flex items-center px-6 py-3">
+                      <span className="flex-1 text-xs text-[var(--text-secondary)]">{feature}</span>
+                      <span className="w-24 text-xs text-[var(--text-tertiary)] text-center">{free}</span>
+                      <span className="w-24 text-xs text-[var(--aiva-blue)] font-medium text-center">{pro}</span>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+
+              <UpgradeModal
+                open={showUpgradeModal}
+                onClose={() => { setShowUpgradeModal(false); refreshSub(); }}
+              />
             </motion.div>
           )}
 

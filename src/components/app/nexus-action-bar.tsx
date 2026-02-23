@@ -7,6 +7,7 @@ import {
   CheckCircle, AlertTriangle,
 } from "lucide-react";
 import type { NexusClassification } from "@/types";
+import { ProButton } from "@/components/app/pro-gate";
 
 interface NexusActionBarProps {
   threadId: string;
@@ -107,23 +108,25 @@ export function NexusActionBar({ threadId, onScheduleMeeting, onTimeboxTask, onD
 
         <div className="flex items-center gap-1.5">
           {(classification.intent === "meeting_request" || classification.intent === "reschedule_request") && (
-            <button
+            <ProButton
+              feature="nexus_meeting_negotiation"
               onClick={() => handleAction(() => onScheduleMeeting(threadId), "Auto-Schedule Meeting")}
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-[var(--aiva-blue)] text-white hover:opacity-90 transition-opacity"
             >
               <Calendar size={12} />
               Auto-Schedule Meeting
-            </button>
+            </ProButton>
           )}
 
           {classification.intent === "task_action" && (
-            <button
+            <ProButton
+              feature="nexus_auto_schedule"
               onClick={() => handleAction(() => onTimeboxTask(threadId), "Block Time to Handle This")}
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-[var(--aiva-blue)] text-white hover:opacity-90 transition-opacity"
             >
               <Clock size={12} />
               Block Time to Handle This
-            </button>
+            </ProButton>
           )}
 
           {classification.intent !== "scheduling_confirmation" && (

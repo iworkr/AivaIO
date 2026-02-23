@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/app/sidebar";
 import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { LearningToast } from "@/components/app/learning-toast";
+import { DunningBanner } from "@/components/app/dunning-banner";
 import { Toast, CommandPalette, CommandItem, CommandGroup } from "@/components/ui";
 import { Home, Inbox, Star, FileText, Settings, Zap, Clock, Shield, CheckCircle, CheckSquare, Calendar, Sparkles } from "lucide-react";
+import { SubscriptionContext, useSubscriptionLoader } from "@/hooks/use-subscription";
 
 function IntegrationSuccessDetector({ onSuccess }: { onSuccess: (msg: string) => void }) {
   const searchParams = useSearchParams();
@@ -31,8 +33,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const router = useRouter();
+  const subscriptionValue = useSubscriptionLoader();
 
   return (
+    <SubscriptionContext.Provider value={subscriptionValue}>
     <div className="min-h-screen bg-[var(--background-main)]">
       <Sidebar
         collapsed={sidebarCollapsed}
@@ -46,8 +50,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      <main className="lg:pl-[240px] min-h-screen">
-        {children}
+      <main className="lg:pl-[240px] min-h-screen flex flex-col">
+        <DunningBanner />
+        <div className="flex-1">
+          {children}
+        </div>
       </main>
 
       <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen}>
@@ -103,5 +110,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         onClose={() => setSuccessToast(null)}
       />
     </div>
+    </SubscriptionContext.Provider>
   );
 }

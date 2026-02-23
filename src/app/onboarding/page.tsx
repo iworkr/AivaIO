@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button, ToggleSwitch, ProgressBar } from "@/components/ui";
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 const totalSteps = 6;
+const USE_MAGIC_ONBOARDING = true;
 
 function StepWrapper({
   children,
@@ -42,6 +43,11 @@ const integrations = [
 ];
 
 export default function OnboardingPage() {
+  const routerForRedirect = useRouter();
+  useEffect(() => {
+    if (USE_MAGIC_ONBOARDING) routerForRedirect.replace("/onboarding/magic");
+  }, [routerForRedirect]);
+
   const [step, setStep] = useState(0);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [changelog, setChangelog] = useState(false);
@@ -49,6 +55,7 @@ export default function OnboardingPage() {
   const [finishing, setFinishing] = useState(false);
   const [connectedProviders, setConnectedProviders] = useState<Set<string>>(new Set());
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
+  const [connectError, setConnectError] = useState<string | null>(null);
   const router = useRouter();
   const { user } = useAuth();
 
@@ -82,19 +89,32 @@ export default function OnboardingPage() {
 
   const handleConnect = async (provider: string) => {
     setConnectingProvider(provider);
+    setConnectError(null);
     try {
       const res = await fetch("/api/integrations/connect", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ provider }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `Connection failed (${res.status})`);
+      }
+
       const data = await res.json();
       if (data.authUrl) {
-        setConnectedProviders((prev) => new Set(prev).add(provider));
-        window.open(data.authUrl, "_blank", "width=600,height=700");
+        window.location.assign(data.authUrl);
+      } else {
+        throw new Error("No authorization URL received");
       }
-    } catch {
-      // Connection failed — user can retry or skip
+    } catch (err) {
+      setConnectError(
+        err instanceof Error
+          ? err.message
+          : "We couldn't connect right now. Please try again."
+      );
+      setTimeout(() => setConnectError(null), 5000);
     } finally {
       setConnectingProvider(null);
     }
@@ -250,11 +270,26 @@ export default function OnboardingPage() {
               })}
             </div>
 
+            <AnimatePresence>
+              {connectError && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  className="mb-4 mx-auto max-w-sm rounded-lg bg-[var(--status-error-bg)] border border-[var(--status-error)]/20 px-4 py-3"
+                >
+                  <p className="text-xs text-[var(--status-error)]">
+                    {connectError}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <div className="flex items-center justify-center gap-3">
               <Button variant="ghost" onClick={next}>
                 Skip for now
               </Button>
-              <Button size="lg" onClick={next}>
+              <Button size="lg" onClick={next} disabled={!!connectingProvider}>
                 Continue
                 <ArrowRight size={16} />
               </Button>

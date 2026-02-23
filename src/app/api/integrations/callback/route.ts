@@ -14,11 +14,13 @@ export async function GET(request: Request) {
 
   let provider = "gmail";
   let userId: string | undefined;
+  let returnTo: string | undefined;
 
   try {
     const decoded = JSON.parse(Buffer.from(stateParam, "base64url").toString());
     provider = decoded.provider || "gmail";
     userId = decoded.userId;
+    returnTo = decoded.returnTo;
   } catch {
     return NextResponse.redirect(`${origin}/app/settings?error=invalid_state`);
   }
@@ -110,9 +112,11 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.redirect(`${origin}/app/settings?connected=${provider}`);
+    const successBase = returnTo || "/app/settings";
+    return NextResponse.redirect(`${origin}${successBase}?success=true&integration=${provider}`);
   } catch (err) {
     console.error(`OAuth callback error for ${provider}:`, err);
-    return NextResponse.redirect(`${origin}/app/settings?error=token_exchange_failed`);
+    const errorBase = returnTo || "/app/settings";
+    return NextResponse.redirect(`${origin}${errorBase}?error=token_exchange_failed`);
   }
 }

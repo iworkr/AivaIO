@@ -13,6 +13,7 @@ import { AIResponseRenderer, ResearchingState } from "@/components/widgets";
 import { EmptyStateHook } from "@/components/app/empty-state-hook";
 import { NexusBriefing } from "@/components/app/nexus-briefing";
 import { PendingActionsQueue } from "@/components/app/pending-actions-queue";
+import { ProGate } from "@/components/app/pro-gate";
 import type { AIResponse } from "@/types";
 import {
   ArrowUp, Paperclip, Mic, Sparkles,
@@ -506,7 +507,9 @@ export default function DashboardPage() {
             transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
             className="w-full max-w-4xl mb-6"
           >
-            <NexusBriefing onAskAiva={sendMessage} />
+            <ProGate feature="daily_briefing" mode="blur">
+              <NexusBriefing onAskAiva={sendMessage} />
+            </ProGate>
           </motion.div>
 
           {/* ═══════ QUICK ACTION CARDS ═══════ */}

@@ -265,3 +265,54 @@ export interface CalendarEvent {
   createdBy?: "user" | "aiva";
   sourceAction?: string;
 }
+
+/* ═══════════════ Subscription & Billing Types ═══════════════ */
+
+export type SubscriptionTier = "free" | "pro";
+export type BillingInterval = "monthly" | "annual";
+
+export type ProFeature =
+  | "nexus_auto_schedule"
+  | "nexus_meeting_negotiation"
+  | "daily_briefing"
+  | "unlimited_calendars"
+  | "autonomous_mode"
+  | "unlimited_ai_drafts";
+
+export interface SubscriptionStatus {
+  tier: SubscriptionTier;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  billingInterval?: BillingInterval;
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd?: boolean;
+  paymentFailed?: boolean;
+  graceDeadline?: string;
+}
+
+export const PRO_FEATURES: Record<ProFeature, { label: string; description: string }> = {
+  nexus_auto_schedule: {
+    label: "AI Auto-Scheduling",
+    description: "Let AIVA autonomously schedule meetings from your email threads.",
+  },
+  nexus_meeting_negotiation: {
+    label: "Meeting Negotiation",
+    description: "AIVA handles the back-and-forth of scheduling without human intervention.",
+  },
+  daily_briefing: {
+    label: "Daily Synthesis Briefing",
+    description: "Cross-referenced inbox + calendar morning summary prepared by AIVA.",
+  },
+  unlimited_calendars: {
+    label: "Unlimited Calendar Accounts",
+    description: "Connect all your calendars for unified availability.",
+  },
+  autonomous_mode: {
+    label: "Fully Autonomous Mode",
+    description: "AIVA executes scheduling actions without asking for approval.",
+  },
+  unlimited_ai_drafts: {
+    label: "Unlimited AI Drafts",
+    description: "No monthly cap on AI-generated email drafts.",
+  },
+};
