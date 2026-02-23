@@ -7,8 +7,9 @@ import { KeyboardShortcuts } from "@/components/app/keyboard-shortcuts";
 import { LearningToast } from "@/components/app/learning-toast";
 import { DunningBanner } from "@/components/app/dunning-banner";
 import { Toast, CommandPalette, CommandItem, CommandGroup } from "@/components/ui";
-import { Home, Inbox, Star, FileText, Settings, Zap, Clock, Shield, CheckCircle, CheckSquare, Calendar, Sparkles } from "lucide-react";
+import { Home, Inbox, Star, FileText, Settings, Zap, Clock, Shield, CheckCircle, CheckSquare, Calendar, Sparkles, LogOut } from "lucide-react";
 import { SubscriptionContext, useSubscriptionLoader } from "@/hooks/use-subscription";
+import { createClient } from "@/lib/supabase/client";
 
 function IntegrationSuccessDetector({ onSuccess }: { onSuccess: (msg: string) => void }) {
   const searchParams = useSearchParams();
@@ -92,6 +93,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <CommandGroup label="Actions">
           <CommandItem icon={<Zap size={14} />}>Recalibrate Tone Profile</CommandItem>
           <CommandItem icon={<Clock size={14} />}>View Sync Status</CommandItem>
+        </CommandGroup>
+        <CommandGroup label="Account">
+          <CommandItem
+            icon={<LogOut size={14} />}
+            onClick={async () => {
+              await createClient().auth.signOut();
+              setCmdOpen(false);
+              router.push("/auth/login");
+            }}
+          >
+            Log out
+          </CommandItem>
         </CommandGroup>
       </CommandPalette>
 

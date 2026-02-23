@@ -14,8 +14,9 @@ import { ThemeToggle } from "./theme-toggle";
 import {
   Command, Inbox, CheckSquare, Calendar,
   Settings, Search, ChevronsUpDown,
-  Menu, X, Settings2,
+  Menu, X, Settings2, LogOut,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 interface SidebarProps {
   collapsed?: boolean;
@@ -43,6 +44,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const unreadCount = useUnreadCount();
   const [hoveredIntegration, setHoveredIntegration] = useState<string | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/auth/login");
+  };
 
   const userName = (user?.user_metadata?.full_name as string) || user?.email?.split("@")[0] || "User";
   const userEmail = user?.email || "";
@@ -209,6 +216,13 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             <Avatar initials={userInitial} size="sm" />
             <span className="text-xs text-[var(--text-secondary)] flex-1 truncate">{userEmail}</span>
           </div>
+          <button
+            onClick={handleLogout}
+            className="h-[32px] rounded-md flex items-center px-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors duration-150 w-full"
+          >
+            <LogOut size={16} className="shrink-0 mr-3 text-[var(--text-tertiary)]" />
+            <span className="flex-1 text-left">Log out</span>
+          </button>
         </div>
       </aside>
 
