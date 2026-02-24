@@ -266,9 +266,25 @@ export default function ConversationPage() {
     } catch { /* handled by action bar feedback */ }
   }, [thread]);
 
-  const handleDecline = useCallback(async (_tid: string) => {
-    // Placeholder: could auto-draft a contextual decline
-  }, []);
+  const handleDecline = useCallback(async (tid: string) => {
+    const lastMessage = messages?.[messages.length - 1];
+    if (!lastMessage) return;
+    try {
+      const res = await fetch("/api/ai/draft-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          threadId: tid,
+          messageContext: `[DECLINE REQUEST] Draft a polite, professional decline for this message:\n\n${lastMessage.body || lastMessage.snippet || ""}`,
+          channel: thread?.provider?.toUpperCase() || "GMAIL",
+          senderEmail,
+        }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.draft) setDraftText(data.draft);
+    } catch { /* handled by NexusActionBar feedback */ }
+  }, [messages, thread, senderEmail]);
 
   const ltv = shopifyCustomer?.total_spent ? Number(shopifyCustomer.total_spent) : 0;
   const ordersCount = shopifyCustomer?.orders_count || 0;

@@ -11,9 +11,12 @@ export function getStripe(): Stripe {
   return _stripe;
 }
 
-export const STRIPE_PRICES = {
-  monthly: process.env.STRIPE_PRICE_MONTHLY || "price_monthly_placeholder",
-  annual: process.env.STRIPE_PRICE_ANNUAL || "price_annual_placeholder",
-} as const;
+export function getStripePrices(): { monthly: string; annual: string } {
+  const monthly = process.env.STRIPE_PRICE_MONTHLY;
+  const annual = process.env.STRIPE_PRICE_ANNUAL;
+  if (!monthly) throw new Error("STRIPE_PRICE_MONTHLY not set");
+  if (!annual) throw new Error("STRIPE_PRICE_ANNUAL not set");
+  return { monthly, annual };
+}
 
 export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";

@@ -5,6 +5,7 @@ import {
   getFreeBusySlots,
   findAvailableSlots,
   createPendingAction,
+  executePendingAction,
 } from "@/lib/ai/nexus-engine";
 import { callLLM } from "@/lib/ai/llm-client";
 
@@ -99,8 +100,27 @@ Write only the email body — no subject line. Be warm but concise. Match the us
       executedAt: undefined,
     });
 
+    // In autonomous mode, execute immediately without waiting for user approval
+    if (rules.autonomousMode) {
+      const execResult = await executePendingAction(supabase, user.id, action.id);
+      return NextResponse.json({
+        success: true,
+        autonomous: true,
+        executed: execResult.success,
+        execError: execResult.error,
+        pendingActionId: action.id,
+        draftReply: draftText,
+        proposedSlots: available.map((s) => ({ start: s.start, end: s.end })),
+        rules: {
+          buffer: rules.bufferMinutes,
+          workingHours: `${rules.workingHoursStart}–${rules.workingHoursEnd}`,
+        },
+      });
+    }
+
     return NextResponse.json({
       success: true,
+      autonomous: false,
       pendingActionId: action.id,
       draftReply: draftText,
       proposedSlots: available.map((s) => ({

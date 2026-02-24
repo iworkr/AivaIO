@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Button, Input, Slider, ToggleSwitch, Badge, Avatar, ProgressBar } from "@/components/ui";
+import { Button, Input, Slider, ToggleSwitch, Badge, Avatar, ProgressBar, LoadingBar } from "@/components/ui";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { useAuth } from "@/hooks/use-auth";
 import { useSupabaseQuery } from "@/hooks/use-supabase-query";
@@ -126,16 +126,11 @@ export default function SettingsPage() {
   const handleRecalibrate = async () => {
     setIsRecalibrating(true);
     try {
-      await fetch("/api/ai/draft-reply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ threadId: "recalibrate", messageContext: "recalibrate", channel: "EMAIL" }),
-      });
-    } catch { /* best effort */ }
-    setTimeout(() => {
+      await fetch("/api/ai/recalibrate", { method: "POST" });
+    } catch { /* best effort */ } finally {
       setIsRecalibrating(false);
       refetchVoice();
-    }, 3000);
+    }
   };
 
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
@@ -177,6 +172,7 @@ export default function SettingsPage() {
     { provider: "gmail", name: "Gmail", desc: "Email inbox & sent history" },
     { provider: "slack", name: "Slack", desc: "Channels & direct messages" },
     { provider: "shopify", name: "Shopify", desc: "Orders, customers & support" },
+    { provider: "microsoft", name: "Outlook / Teams", desc: "Calendar sync for Nexus scheduling" },
   ].map((item) => {
     const conn = (connections || []).find((c: Record<string, unknown>) => (c.provider as string)?.toLowerCase() === item.provider);
     return {
@@ -528,7 +524,7 @@ export default function SettingsPage() {
                   <RefreshCw size={14} className={isRecalibrating ? "animate-spin" : ""} />
                   {isRecalibrating ? "Recalibrating..." : "Recalibrate from Sent Mail"}
                 </Button>
-                {isRecalibrating && <ProgressBar value={65} />}
+                {isRecalibrating && <LoadingBar />}
               </motion.div>
             </motion.div>
           )}

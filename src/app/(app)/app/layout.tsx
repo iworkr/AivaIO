@@ -33,6 +33,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [isRecalibrating, setIsRecalibrating] = useState(false);
   const router = useRouter();
   const subscriptionValue = useSubscriptionLoader();
 
@@ -91,8 +92,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </CommandItem>
         </CommandGroup>
         <CommandGroup label="Actions">
-          <CommandItem icon={<Zap size={14} />}>Recalibrate Tone Profile</CommandItem>
-          <CommandItem icon={<Clock size={14} />}>View Sync Status</CommandItem>
+          <CommandItem
+            icon={<Zap size={14} className={isRecalibrating ? "animate-pulse" : ""} />}
+            onClick={async () => {
+              setCmdOpen(false);
+              setIsRecalibrating(true);
+              try {
+                const res = await fetch("/api/ai/recalibrate", { method: "POST" });
+                if (res.ok) {
+                  setSuccessToast("Tone profile recalibrated from sent mail.");
+                }
+              } catch { /* ignore */ } finally {
+                setIsRecalibrating(false);
+              }
+            }}
+          >
+            {isRecalibrating ? "Recalibrating…" : "Recalibrate Tone Profile"}
+          </CommandItem>
+          <CommandItem
+            icon={<Clock size={14} />}
+            onClick={() => { router.push("/app/settings?section=integrations"); setCmdOpen(false); }}
+          >
+            View Sync Status
+          </CommandItem>
         </CommandGroup>
         <CommandGroup label="Account">
           <CommandItem

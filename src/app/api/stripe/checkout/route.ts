@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getStripe, STRIPE_PRICES } from "@/lib/stripe/server";
+import { getStripe, getStripePrices } from "@/lib/stripe/server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,7 +9,8 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { interval = "annual" } = await req.json();
-    const priceId = interval === "monthly" ? STRIPE_PRICES.monthly : STRIPE_PRICES.annual;
+    const prices = getStripePrices();
+    const priceId = interval === "monthly" ? prices.monthly : prices.annual;
     const stripe = getStripe();
 
     const { data: profile } = await supabase

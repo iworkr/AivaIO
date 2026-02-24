@@ -90,6 +90,18 @@ export function UberIcon({ size = 16, className = "" }: IconProps) {
   );
 }
 
+export function GenericMessageIcon({ size = 16, className = "" }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"
+        fill="currentColor"
+        opacity="0.5"
+      />
+    </svg>
+  );
+}
+
 const SENDER_BRAND_MAP: Record<string, React.FC<IconProps>> = {
   gmail: GmailIcon,
   google: GoogleIcon,
@@ -102,10 +114,10 @@ const SENDER_BRAND_MAP: Record<string, React.FC<IconProps>> = {
   uber: UberIcon,
 };
 
-export function getBrandIcon(senderOrProvider: string): React.FC<IconProps> | null {
+export function getBrandIcon(senderOrProvider: string): React.FC<IconProps> {
   const key = senderOrProvider.toLowerCase();
   for (const [brand, icon] of Object.entries(SENDER_BRAND_MAP)) {
     if (key.includes(brand)) return icon;
   }
-  return null;
+  return GenericMessageIcon;
 }

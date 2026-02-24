@@ -70,6 +70,19 @@ export const oauthConfigs: Record<string, () => OAuthConfig> = {
     tokenUrl: "",
     scopes: ["read_customers", "read_orders"],
   }),
+  microsoft: () => ({
+    clientId: process.env.MICROSOFT_CLIENT_ID || process.env.AZURE_CLIENT_ID || "",
+    clientSecret: process.env.MICROSOFT_CLIENT_SECRET || process.env.AZURE_CLIENT_SECRET || "",
+    redirectUri: `${getAppUrl()}/api/integrations/callback`,
+    authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    scopes: [
+      "https://graph.microsoft.com/Calendars.ReadWrite",
+      "https://graph.microsoft.com/User.Read",
+      "offline_access",
+      "openid",
+    ],
+  }),
 };
 
 export function buildOAuthUrl(provider: string, state: string, shopDomain?: string): string {
@@ -91,9 +104,13 @@ export function buildOAuthUrl(provider: string, state: string, shopDomain?: stri
     scope: config.scopes.join(" "),
     response_type: "code",
     state,
-    access_type: "offline",
-    prompt: "consent",
   };
+
+  // Google requires access_type=offline for refresh tokens; Microsoft uses offline_access scope
+  if (provider !== "microsoft") {
+    params.access_type = "offline";
+    params.prompt = "consent";
+  }
 
   return `${config.authUrl}?` + new URLSearchParams(params).toString();
 }
@@ -122,7 +139,7 @@ export async function exchangeCodeForToken(
     body.grant_type = "authorization_code";
   }
 
-  const contentType = provider === "slack"
+  const contentType = (provider === "slack" || provider === "microsoft")
     ? "application/x-www-form-urlencoded"
     : "application/json";
 
@@ -151,6 +168,20 @@ export async function exchangeCodeForToken(
       if (profileRes.ok) {
         const profile = await profileRes.json();
         email = profile.email;
+      }
+    } catch {
+      // non-critical
+    }
+  }
+
+  if (provider === "microsoft" && data.access_token) {
+    try {
+      const profileRes = await fetch("https://graph.microsoft.com/v1.0/me", {
+        headers: { Authorization: `Bearer ${data.access_token}` },
+      });
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        email = profile.userPrincipalName || profile.mail;
       }
     } catch {
       // non-critical

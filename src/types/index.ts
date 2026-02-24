@@ -175,6 +175,7 @@ export interface SchedulingRules {
   defaultVideoLink?: string;
   focusTimeBlocks?: Array<{ dayOfWeek: number; start: string; end: string }>;
   timezone: string;
+  autonomousMode?: boolean;
 }
 
 export type PendingActionType = "send_scheduling_email" | "create_calendar_event" | "timebox_task" | "auto_reply" | "reschedule";

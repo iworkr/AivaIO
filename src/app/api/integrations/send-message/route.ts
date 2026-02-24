@@ -93,7 +93,150 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, messageId: result.id, threadId: result.threadId });
     }
 
-    return NextResponse.json({ error: `Channel ${effectiveChannel} send not implemented` }, { status: 501 });
+    if (effectiveChannel === "SLACK") {
+      const { data: connection } = await supabase
+        .from("channel_connections")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("provider", "slack")
+        .eq("status", "active")
+        .single();
+
+      if (!connection) {
+        return NextResponse.json({ error: "No active Slack connection found" }, { status: 400 });
+      }
+
+      // provider_thread_id format: slack_{channelId}_{threadTs}
+      const { data: thread } = await supabase
+        .from("threads")
+        .select("provider_thread_id")
+        .eq("id", threadId)
+        .single();
+
+      const parts = (thread?.provider_thread_id || "").split("_");
+      const channelId = parts[1];
+      const threadTs = parts[2];
+
+      if (!channelId) {
+        return NextResponse.json({ error: "Could not determine Slack channel from thread" }, { status: 400 });
+      }
+
+      const slackPayload: Record<string, string> = { channel: channelId, text: finalText };
+      if (threadTs) slackPayload.thread_ts = threadTs;
+
+      const slackRes = await fetch("https://slack.com/api/chat.postMessage", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${connection.access_token}`,
+          "Content-Type": "application/json; charset=utf-8",
+        },
+        body: JSON.stringify(slackPayload),
+      });
+
+      const slackData = await slackRes.json();
+      if (!slackData.ok) {
+        throw new Error(`Slack API error: ${slackData.error}`);
+      }
+
+      await supabase
+        .from("threads")
+        .update({ has_draft: false, is_unread: false })
+        .eq("id", threadId);
+
+      await supabase.from("ai_action_logs").insert({
+        workspace_id: user.user_metadata?.workspace_id,
+        action: "AUTO_SEND",
+        channel: "SLACK",
+        recipient: channelId,
+        confidence_score: 0.92,
+        original_message: originalAIVADraft,
+        dispatched_draft: finalText,
+      });
+
+      if (originalAIVADraft && originalAIVADraft !== finalText) {
+        processDeltaFeedback(originalAIVADraft, finalText);
+      }
+
+      return NextResponse.json({ success: true, messageId: slackData.ts, channelId });
+    }
+
+    if (effectiveChannel === "SHOPIFY") {
+      // Shopify replies are sent as emails to the customer via the user's Gmail connection
+      const recipientEmail = to;
+      if (!recipientEmail) {
+        return NextResponse.json({ error: "Recipient email is required for Shopify replies" }, { status: 400 });
+      }
+
+      const { data: gmailConnection } = await supabase
+        .from("channel_connections")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("provider", "gmail")
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (!gmailConnection) {
+        return NextResponse.json(
+          { error: "A Gmail connection is required to reply to Shopify customers" },
+          { status: 400 }
+        );
+      }
+
+      let accessToken = gmailConnection.access_token;
+      const expiresAt = new Date(gmailConnection.token_expires_at || 0);
+      if (expiresAt <= new Date()) {
+        const refreshed = await refreshGmailToken(gmailConnection.refresh_token);
+        accessToken = refreshed.accessToken;
+        await supabase
+          .from("channel_connections")
+          .update({ access_token: refreshed.accessToken, token_expires_at: refreshed.expiresAt.toISOString() })
+          .eq("id", gmailConnection.id);
+      }
+
+      const { data: shopThread } = await supabase
+        .from("threads")
+        .select("primary_subject")
+        .eq("id", threadId)
+        .single();
+
+      const emailSubject =
+        subject ||
+        (shopThread?.primary_subject ? `Re: ${shopThread.primary_subject}` : "Re: Your Order");
+
+      const result = await sendGmailMessage({
+        accessToken,
+        to: recipientEmail,
+        subject: emailSubject,
+        body: finalText,
+        from: gmailConnection.provider_account_name || user.email || "",
+      });
+
+      await supabase
+        .from("threads")
+        .update({ has_draft: false, is_unread: false })
+        .eq("id", threadId);
+
+      await supabase.from("ai_action_logs").insert({
+        workspace_id: user.user_metadata?.workspace_id,
+        action: "AUTO_SEND",
+        channel: "SHOPIFY",
+        recipient: recipientEmail,
+        confidence_score: 0.92,
+        original_message: originalAIVADraft,
+        dispatched_draft: finalText,
+      });
+
+      if (originalAIVADraft && originalAIVADraft !== finalText) {
+        processDeltaFeedback(originalAIVADraft, finalText);
+      }
+
+      return NextResponse.json({ success: true, messageId: result.id });
+    }
+
+    return NextResponse.json(
+      { error: `${effectiveChannel} send is not yet configured. Contact support to enable this integration.` },
+      { status: 400 }
+    );
   } catch (err) {
     console.error("send-message error:", err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
