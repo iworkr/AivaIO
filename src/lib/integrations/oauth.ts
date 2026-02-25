@@ -34,11 +34,10 @@ export interface OAuthConfig {
 }
 
 function getAppUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL
-    || process.env.NEXT_PUBLIC_SITE_URL
-    || process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : "http://localhost:3000";
+  if (process.env.NEXT_PUBLIC_APP_URL) return process.env.NEXT_PUBLIC_APP_URL;
+  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  return "http://localhost:3000";
 }
 
 export const oauthConfigs: Record<string, () => OAuthConfig> = {
